@@ -17,6 +17,7 @@
     --good:#4C7A53; --good-soft:#EAF1EA;
     --danger:#A44A3F; --danger-soft:#F5E5E1;
     --sleep:#3D4E7A; --sleep-soft:#E7E9F2;
+    --growth-actual:#9C1F1F;
     --surface:#FFFFFF; --shadow: 0 1px 2px rgba(46,43,51,.06), 0 6px 20px -8px rgba(46,43,51,.18);
     color-scheme: light;
   }
@@ -30,6 +31,7 @@
       --good:#93C199; --good-soft:#22301F;
       --danger:#E19686; --danger-soft:#3A2420;
       --sleep:#9FADD9; --sleep-soft:#2A2E45;
+      --growth-actual:#E2685A;
       --surface:#242230; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -8px rgba(0,0,0,.5);
       color-scheme: dark;
     }
@@ -42,6 +44,7 @@
     --soiled:#D0946A; --soiled-soft:#362619;
     --good:#93C199; --good-soft:#22301F;
     --danger:#E19686; --danger-soft:#3A2420;
+    --growth-actual:#E2685A;
     --surface:#242230; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -8px rgba(0,0,0,.5);
     color-scheme: dark;
   }
@@ -126,6 +129,12 @@
   .chip.sel{ background:var(--accent); border-color:var(--accent); color:#fff; }
   input[type=number], input[type=text], input[type=time], input[type=date]{ width:100%; padding:11px 12px; border-radius:10px; border:1px solid var(--line-strong);
     background:var(--surface); color:var(--ink); font:inherit; font-family:'IBM Plex Mono',monospace; font-size:1rem; }
+  textarea{ width:100%; padding:11px 12px; border-radius:10px; border:1px solid var(--line-strong); background:var(--surface); color:var(--ink);
+    font:inherit; font-family:'Nunito Sans',sans-serif; font-size:.92rem; resize:vertical; min-height:52px; }
+  .medlist{ display:flex; flex-direction:column; gap:8px; }
+  button.medopt{ border:1px solid var(--line-strong); background:var(--surface); color:var(--ink); border-radius:12px; padding:13px 14px;
+    text-align:left; font-weight:700; font-size:.92rem; cursor:pointer; font-family:'Nunito Sans',sans-serif; }
+  button.medopt:active{ transform:scale(.98); }
   .presets{ display:flex; flex-wrap:wrap; gap:7px; margin-top:8px; }
   .preset{ border:1px solid var(--line-strong); background:var(--surface); border-radius:9px; padding:7px 11px; font-family:'IBM Plex Mono',monospace;
     font-size:.82rem; font-weight:500; cursor:pointer; color:var(--ink); }
@@ -142,6 +151,8 @@
   .hist-toggle button{ border:1px solid var(--line-strong); background:var(--surface); border-radius:9px; padding:7px 14px;
     font-weight:700; font-size:.8rem; cursor:pointer; color:var(--ink-soft); font-family:'Nunito Sans',sans-serif; }
   .hist-toggle button.on{ background:var(--accent-soft); border-color:var(--accent); color:var(--accent-ink); }
+  .hist-toggle button.exportbtn{ margin-left:auto; background:var(--surface); border-color:var(--line-strong); color:var(--ink); }
+  .hist-toggle button.exportbtn:disabled{ opacity:.6; cursor:default; }
   .day-card{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:13px 14px; margin-bottom:9px; box-shadow:var(--shadow); cursor:pointer; }
   .day-card .dhead{ display:flex; justify-content:space-between; align-items:baseline; }
   .day-card .ddate{ font-weight:800; font-size:.92rem; }
@@ -202,6 +213,7 @@
       <div class="hist-toggle">
         <button data-mode="days" class="on">Days</button>
         <button data-mode="weeks">Weeks</button>
+        <button id="exportBtn" class="exportbtn" type="button">⇩ Export</button>
       </div>
       <div id="historyList"><div class="empty">Loading history…</div></div>
     </section>
@@ -215,7 +227,7 @@
       </div>
       <div class="growth-chart-wrap" id="growthChartWrap"><div class="empty">Loading…</div></div>
       <div class="glegend">
-        <span><i style="background:var(--accent)"></i>Lolu</span>
+        <span><i style="background:var(--growth-actual)"></i>Lolu</span>
         <span><i style="background:var(--ink-soft)"></i>50th (median)</span>
         <span><i style="background:#E8B4A6"></i>0.4th / 2nd / 9th</span>
         <span><i style="background:#E9C27E"></i>25th</span>
@@ -240,6 +252,7 @@
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script>
 (function(){
   "use strict";
@@ -259,8 +272,17 @@
     {key:'nappy',label:'Nappy',      note:'Wet / soiled',     color:'wet',   nappy:true},
     {key:'sleep',label:'Sleep',      note:'Tap to start, tap again to end', color:'sleep', sleepTile:true},
     {key:'vomit',label:'Sick',       note:'Vomit / posset',   color:'soiled'},
-    {key:'vitd', label:'Vitamin D',  note:'Daily drops',      color:'good'},
-    {key:'gaviscon',label:'Gaviscon',note:'Reflux dose',      color:'good'}
+    {key:'med',  label:'Medication',note:'Vitamin D, Gaviscon, Calpol & more', color:'good', picker:true},
+    // Hidden from the Log grid — reached through the Medication picker above,
+    // but kept as their own CATS entries so they still open the plain
+    // logger+date+time sheet, and so historical vitd/gaviscon events (logged
+    // before the picker existed) keep rendering exactly as before.
+    {key:'vitd', label:'Vitamin D',  note:'Daily drops',      color:'good',  hidden:true},
+    {key:'gaviscon',label:'Gaviscon',note:'Reflux dose',      color:'good',  hidden:true},
+    {key:'calpol',label:'Calpol',   note:'Infant paracetamol',color:'good',  hidden:true},
+    {key:'infacol',label:'Infacol', note:'Anti-colic drops',  color:'good',  hidden:true},
+    {key:'gripe',label:'Gripe water',note:'Wind relief',      color:'good',  hidden:true},
+    {key:'med_other',label:'Medication',note:'Custom / other',color:'good',  hidden:true, customName:true}
   ];
   var CAT_BY_KEY = {}; CATS.forEach(function(c){ CAT_BY_KEY[c.key]=c; });
   var LOGGERS = ['Yasemin','Tobi','Mammy','Melissa','Grandma','Adam','Krystal'];
@@ -276,9 +298,10 @@
     var h = Math.floor(mins/60), m = mins%60;
     return h + 'h' + (m ? ' ' + m + 'm' : '');
   }
+  function escText(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
   function describeEvent(ev){
     var c = CAT_BY_KEY[ev.ty] || {label: ev.ty, color:'ink-soft'};
-    var main = c.label;
+    var main = (ev.ty === 'med_other' && ev.med) ? escText(ev.med) : c.label;
     var bits = [];
     if (ev.ty === 'sleep'){
       if (typeof ev.dur === 'number' && ev.end) bits.push(durLabel(ev.dur) + ' · ended ' + ev.end);
@@ -289,6 +312,7 @@
       if (typeof ev.dur === 'number') bits.push(ev.dur + ' min');
       if (ev.side) bits.push(ev.side);
     }
+    if (ev.note) bits.push('“' + escText(ev.note) + '”');
     if (bits.length) main += ' · ' + bits.join(' · ');
     return {title: main, color: c.color};
   }
@@ -450,7 +474,7 @@
   // ---------- render: log tab ----------
   function renderCatGrid(){
     var grid = document.getElementById('catGrid');
-    grid.innerHTML = CATS.map(function(c){
+    grid.innerHTML = CATS.filter(function(c){ return !c.hidden; }).map(function(c){
       return '<button class="cat" data-key="'+c.key+'"><div class="cdot" style="background:var(--'+c.color+')"></div>'+
         '<div class="cname">'+c.label+'</div><div class="cnote">'+c.note+'</div></button>';
     }).join('');
@@ -460,10 +484,35 @@
         if (cat.sleepTile){
           var ref = currentOpenSleep();
           openSleepSheet(ref ? ref.dateStr : currentCycle, ref ? ref.ev : null);
+        } else if (cat.picker){
+          openMedPicker();
         } else {
           openSheet(cat);
         }
       });
+    });
+  }
+
+  // ---------- medication picker (Log tab "Medication" tile) ----------
+  var MED_OPTIONS = [
+    {key:'vitd', label:'Vitamin D'},
+    {key:'gaviscon', label:'Gaviscon'},
+    {key:'calpol', label:'Calpol'},
+    {key:'infacol', label:'Infacol'},
+    {key:'gripe', label:'Gripe water'},
+    {key:'med_other', label:'Other…'}
+  ];
+  function openMedPicker(){
+    var html = '<h3><span class="swatch" style="background:var(--good)"></span>Medication</h3>'+
+      '<div class="field"><label>Which medication?</label><div class="medlist">'+
+      MED_OPTIONS.map(function(o){ return '<button type="button" class="medopt" data-k="'+o.key+'">'+o.label+'</button>'; }).join('')+
+      '</div></div>'+
+      '<div class="rowbtns"><button class="cancel" id="sheetCancel">Cancel</button></div>';
+    document.getElementById('sheet').innerHTML = html;
+    document.getElementById('sheetBackdrop').classList.add('show');
+    document.getElementById('sheetCancel').addEventListener('click', closeSheet);
+    document.getElementById('sheet').querySelectorAll('.medopt').forEach(function(b){
+      b.addEventListener('click', function(){ openSheet(CAT_BY_KEY[b.dataset.k]); });
     });
   }
 
@@ -478,6 +527,8 @@
       dur: (editCtx && typeof editCtx.ev.dur === 'number') ? editCtx.ev.dur : (cat.durDefault || null),
       nap: editCtx ? (editCtx.ev.nap || null) : null,
       side: editCtx ? (editCtx.ev.side || null) : null,
+      medName: editCtx ? (editCtx.ev.med || '') : '',
+      note: editCtx ? (editCtx.ev.note || '') : '',
       time: editCtx ? editCtx.ev.t : hhmm(new Date()),
       date: editCtx ? calendarDateForEvent(editCtx.dateStr, editCtx.ev.t) : dstr(new Date()),
       edit: editCtx || null
@@ -503,7 +554,7 @@
 
     if (isEdit){
       html += '<div class="field"><label>Type (change if mis-logged)</label><div class="chips" id="typeChips">'+
-        CATS.map(function(cc){ return '<div class="chip'+(c.key===cc.key?' sel':'')+'" data-k="'+cc.key+'">'+cc.label+'</div>'; }).join('')+
+        CATS.filter(function(cc){ return !cc.picker; }).map(function(cc){ return '<div class="chip'+(c.key===cc.key?' sel':'')+'" data-k="'+cc.key+'">'+cc.label+'</div>'; }).join('')+
         '</div></div>';
     }
 
@@ -542,6 +593,13 @@
       html += '<div class="field"><label>Minutes'+(c.durOptional?' (optional)':'')+'</label>'+
         '<input type="number" inputmode="numeric" id="durInput" placeholder="minutes" value="'+(sheetState.dur||'')+'"></div>';
     }
+    if (c.customName){
+      html += '<div class="field"><label>Medication name</label>'+
+        '<input type="text" id="medNameInput" placeholder="e.g. Teething gel" value="'+escText(sheetState.medName)+'"></div>';
+    }
+
+    html += '<div class="field"><label>Note (optional)</label>'+
+      '<textarea id="noteInput" rows="2" placeholder="e.g. nappy was very heavy, poo was green">'+escText(sheetState.note)+'</textarea></div>';
 
     html += '<div class="saymsg" id="sheetMsg"></div>';
     html += '<div class="rowbtns"><button class="cancel" id="sheetCancel">Cancel</button><button class="save" id="sheetSave">Save</button></div>';
@@ -557,6 +615,7 @@
         sheetState.cat = newCat;
         sheetState.ml = null; sheetState.nap = null; sheetState.side = null; sheetState.leftover = null;
         sheetState.dur = newCat.durDefault || null;
+        sheetState.medName = '';
         renderSheet();
       });
     });
@@ -583,6 +642,10 @@
     if (durIn) durIn.addEventListener('input', function(){ sheetState.dur = this.value ? Number(this.value) : null; });
     var otherIn = document.getElementById('otherName');
     if (otherIn) otherIn.addEventListener('input', function(){ sheetState.logger = this.value || '__other__'; });
+    var medNameIn = document.getElementById('medNameInput');
+    if (medNameIn) medNameIn.addEventListener('input', function(){ sheetState.medName = this.value; });
+    var noteIn = document.getElementById('noteInput');
+    if (noteIn) noteIn.addEventListener('input', function(){ sheetState.note = this.value; });
   }
 
   function submitSheet(){
@@ -596,6 +659,7 @@
     if (c.ml && !sheetState.ml){ msg.textContent = 'Enter how many ml.'; return; }
     if (c.leftover && sheetState.leftover != null && (sheetState.leftover < 0 || sheetState.leftover > sheetState.ml)){ msg.textContent = 'Leftover can\'t be more than the amount offered.'; return; }
     if (c.nappy && !sheetState.nap){ msg.textContent = 'Pick wet, soiled, or both.'; return; }
+    if (c.customName && !(sheetState.medName && sheetState.medName.trim())){ msg.textContent = 'Enter the medication name.'; return; }
 
     var ev = {
       id: isEdit ? sheetState.edit.ev.id : (Date.now().toString(36)+Math.random().toString(36).slice(2,7)),
@@ -606,6 +670,8 @@
     if (c.nappy) ev.nap = sheetState.nap;
     if (c.side && sheetState.side) ev.side = sheetState.side;
     if (c.dur && sheetState.dur) ev.dur = sheetState.dur;
+    if (c.customName) ev.med = sheetState.medName.trim();
+    if (sheetState.note && sheetState.note.trim()) ev.note = sheetState.note.trim();
 
     rememberLogger(loggerName);
     lastLogger = loggerName;
@@ -664,7 +730,8 @@
       logger: ev ? ev.by : lastLogger,
       startTime: ev ? ev.t : hhmm(new Date()),
       endTime: (ev && ev.end) ? ev.end : hhmm(new Date()),
-      date: ev ? calendarDateForEvent(dateStr, ev.t) : dstr(new Date())
+      date: ev ? calendarDateForEvent(dateStr, ev.t) : dstr(new Date()),
+      note: ev ? (ev.note || '') : ''
     };
     document.getElementById('sheetBackdrop').classList.add('show');
     renderSleepSheet();
@@ -690,6 +757,9 @@
     } else {
       html += '<div class="hint">Tap the Sleep tile again — or the banner on Today — to end this nap.</div>';
     }
+
+    html += '<div class="field"><label>Note (optional)</label>'+
+      '<textarea id="noteInput" rows="2" placeholder="e.g. very unsettled, woke crying">'+escText(sleepState.note)+'</textarea></div>';
 
     html += '<div class="saymsg" id="sheetMsg"></div>';
     html += '<div class="rowbtns">'+
@@ -727,6 +797,8 @@
       var dh = document.getElementById('durHint');
       if (dh) dh.textContent = 'Duration: ' + durLabel(minutesBetween(sleepState.startTime, sleepState.endTime));
     });
+    var noteIn = document.getElementById('noteInput');
+    if (noteIn) noteIn.addEventListener('input', function(){ sleepState.note = this.value; });
   }
   function submitSleepSheet(){
     var msg = document.getElementById('sheetMsg');
@@ -744,6 +816,7 @@
 
     if (sleepState.mode === 'start'){
       var ev = { id: Date.now().toString(36)+Math.random().toString(36).slice(2,7), ty:'sleep', by: loggerName, t: sleepState.startTime };
+      if (sleepState.note && sleepState.note.trim()) ev.note = sleepState.note.trim();
       saveEvent(targetDate, ev, function(err){
         if (err){ msg.style.color='var(--danger)'; msg.textContent = err; document.getElementById('sheetSave').disabled=false; return; }
         closeSheet();
@@ -756,6 +829,7 @@
       if (!sleepState.endTime){ msg.style.color='var(--danger)'; msg.textContent = 'Set an end time.'; document.getElementById('sheetSave').disabled=false; return; }
       var dur = minutesBetween(sleepState.startTime, sleepState.endTime);
       var ev2 = { id: sleepState.id, ty:'sleep', by: loggerName, t: sleepState.startTime, end: sleepState.endTime, dur: dur };
+      if (sleepState.note && sleepState.note.trim()) ev2.note = sleepState.note.trim();
       var mode = sleepState.mode, originalDate = sleepState.dateStr;
       var finish = function(err){
         if (err){ msg.style.color='var(--danger)'; msg.textContent = err; document.getElementById('sheetSave').disabled=false; return; }
@@ -1022,7 +1096,7 @@
           var det = card.querySelector('.day-detail');
           if (det.style.display === 'none'){
             var day = historyDays.filter(function(d){ return d.date===card.dataset.date; })[0];
-            var evs = (day.events||[]).slice().sort(function(a,b){ return a.t < b.t ? -1 : 1; });
+            var evs = (day.events||[]).slice().sort(function(a,b){ return a.t < b.t ? 1 : -1; });
             det.innerHTML = evs.map(function(e){
               var dd = describeEvent(e);
               return '<div class="trow" style="padding:6px 0"><div class="tdot" style="background:var(--'+dd.color+')"></div>'+
@@ -1191,9 +1265,9 @@
     var sortedM = measurements.slice().sort(function(a,b){ return a.date<b.date?-1:1; });
     if (sortedM.length){
       var d2 = sortedM.map(function(m,i3){ return (i3===0?'M':'L')+X(ageWeeksFor(m.date)).toFixed(1)+','+Y(m.kg).toFixed(1); }).join(' ');
-      svg += '<path d="'+d2+'" fill="none" style="stroke:var(--accent);stroke-width:2.6px"/>';
+      svg += '<path d="'+d2+'" fill="none" style="stroke:var(--growth-actual);stroke-width:2.6px"/>';
       sortedM.forEach(function(m){
-        svg += '<circle cx="'+X(ageWeeksFor(m.date)).toFixed(1)+'" cy="'+Y(m.kg).toFixed(1)+'" r="4.3" style="fill:var(--accent);stroke:var(--surface);stroke-width:1.5px"/>';
+        svg += '<circle cx="'+X(ageWeeksFor(m.date)).toFixed(1)+'" cy="'+Y(m.kg).toFixed(1)+'" r="4.3" style="fill:var(--growth-actual);stroke:var(--surface);stroke-width:1.5px"/>';
       });
     }
     svg += '</svg>';
@@ -1308,12 +1382,711 @@
     });
   }
 
+  // ---------- export (History tab "Export" button) ----------
+  // Builds a multi-sheet workbook matching the automated daily-backup export
+  // (daily_export.py): Intro, Event log, Daily summary, Weekly summary, Who logged
+  // what, Leftover adjustments, Sleep log, Soiled by hour, Growth data. The one
+  // deviation: the Growth sheet in the automated backup embeds a native Excel
+  // scatter chart (built with openpyxl server-side) — no browser-side xlsx writer
+  // can produce that chart object, so this sheet ships the same data/formulas
+  // without the embedded chart; the live chart is always on the app's Growth tab.
+  // Derived from the app's own CATS/CAT_BY_KEY (defined earlier in this file) so labels
+  // always match what's shown in the app. 'note'/'leftover' are legacy types from the
+  // one-time WhatsApp-history import and aren't in CATS, so they're filled in here.
+  var TYPE_LABELS = { note: 'Note', leftover: 'Leftover (legacy note)' };
+  CATS.forEach(function (c) { TYPE_LABELS[c.key] = c.label; });
+  var MILK_TYPES = {};
+  CATS.forEach(function (c) { if (c.ml) MILK_TYPES[c.key] = 1; });
+
+  var TITLE_FONT = { name: 'Arial', size: 20, bold: true, color: { argb: 'FF1B365D' } };
+  var SUBTITLE_FONT = { name: 'Arial', size: 11, color: { argb: 'FF4A5568' } };
+  var SECTION_FONT = { name: 'Arial', size: 13, bold: true, color: { argb: 'FF0F6C8C' } };
+  var BODY_FONT = { name: 'Arial', size: 11, color: { argb: 'FF1A202C' } };
+  var HEADER_FONT = { name: 'Arial', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+  var HEADER_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B365D' } };
+  var DATA_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF4F7FA' } };
+  var INPUT_FONT = { name: 'Arial', size: 10, color: { argb: 'FF0000FF' } };
+  var FORMULA_FONT = { name: 'Arial', size: 10, color: { argb: 'FF000000' } };
+  var WORKING_FONT = { name: 'Arial', size: 9, italic: true, color: { argb: 'FF8C97A6' } };
+  var WORKING_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFAFAFA' } };
+  var LABEL_FONT = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF1A202C' } };
+  var SOURCE_FONT = { name: 'Arial', size: 9, italic: true, color: { argb: 'FF4A5568' } };
+  var LEGEND_FONT = { name: 'Arial', size: 9, bold: true, italic: true, color: { argb: 'FF8C97A6' } };
+  var CENTER = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  var LEFT_WRAP = { horizontal: 'left', vertical: 'top', wrapText: true };
+  var DATE_FMT = 'dd mmm yyyy';
+
+  // isoWeek(dateStr) reused from the app's existing History-tab helper (defined earlier in this file).
+
+  function colLetter(n) {
+    var s = '';
+    while (n > 0) { var m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - m) / 26); }
+    return s;
+  }
+
+  function excelDate(dateStr) { return new Date(dateStr + 'T00:00:00Z'); }
+
+  // ---------- Sheet: How to read this file ----------
+  function buildIntroSheet(wb, generatedAt, dob, nDays, nEvents) {
+    var ws = wb.addWorksheet('How to read this file', { views: [{ showGridLines: false }] });
+    ws.getColumn(2).width = 100;
+    ws.mergeCells('B2:G2');
+    ws.getCell('B2').value = "Lolu's Log — daily export";
+    ws.getCell('B2').font = TITLE_FONT;
+
+    var lines = [
+      'Generated automatically on ' + generatedAt + ' from the live "Lolu\'s Log" app ' +
+        '(the web app that replaced the WhatsApp group). This snapshot covers ' + nDays +
+        ' logged days and ' + nEvents + ' events, from birth (' + dob + ') to the export date.',
+      '',
+      '1. Daily summary — one row per feed-cycle day (day runs 09:00 to 08:59, matching the ' +
+        'app\'s "today" boundary), with bottle ml (net of any leftover), breast/pump session ' +
+        'counts and minutes, nappy counts, sleep totals, and all-event counts.',
+      '2. Weekly summary — the same totals rolled up by ISO week.',
+      '3. Event log — every single logged event, one row each: time, who logged it, type, ' +
+        'ml offered/left/taken, nappy type, duration, sleep end time, medication name (for a ' +
+        'custom "Other" medication), and any note left on the entry.',
+      '4. Who logged what — a tally of events per person.',
+      '5. Leftover adjustments — every bottle feed where a leftover amount was recorded, ' +
+        'showing what was offered, what was left, and what was actually taken.',
+      '6. Sleep log — every nap: start, end, duration, who logged it.',
+      '7. Soiled by time of day — when soiled nappies tend to happen, by hour.',
+      '8. Growth data — Lolu\'s logged weights plus the UK-WHO 9-centile weight-for-age ' +
+        'reference grid (WHO Child Growth Standards, LMS method), with the same percentile ' +
+        'formulas as the app\'s Growth tab. The live trend chart itself is on the Growth tab ' +
+        'in the app — this workbook format can\'t carry an interactive chart, so this sheet ' +
+        'gives you the numbers to chart yourself if you want one in Excel.',
+      '',
+      'This export is built directly in your browser from the same live data as the automated ' +
+        'daily backup, so it always reflects exactly what\'s been logged — there is no manual ' +
+        'correction step. Bottle totals net off any "leftover" amount recorded against a feed.',
+      '',
+      'This is a reference, not a medical record — bring the Growth data sheet to health ' +
+        'visitor or paediatric checks alongside the feed history above.'
+    ];
+    var r = 4;
+    lines.forEach(function (line) {
+      var c = ws.getCell(r, 2);
+      c.value = line;
+      c.font = BODY_FONT;
+      c.alignment = LEFT_WRAP;
+      ws.mergeCells(r, 2, r, 7);
+      ws.getRow(r).height = line.length > 90 ? 34 : (line ? 28 : 16);
+      r++;
+    });
+    return ws;
+  }
+
+  // ---------- Sheet: Event log ----------
+  var EVLOG_HEADERS = ['Date', 'Time', 'Logged by', 'Event type', 'Offered ml', 'Leftover ml',
+    'Taken ml (net)', 'Nappy', 'Side', 'Duration min', 'Sleep end', 'Sleep duration min',
+    'Medication (if "Other")', 'Note'];
+
+  function buildEventLog(wb, days) {
+    var ws = wb.addWorksheet('Event log');
+    EVLOG_HEADERS.forEach(function (h, i) {
+      var c = ws.getCell(1, 1 + i);
+      c.value = h; c.font = HEADER_FONT; c.fill = HEADER_FILL; c.alignment = CENTER;
+    });
+    var widths = [12, 9, 14, 13, 11, 11, 13, 12, 8, 12, 10, 15, 20, 30];
+    widths.forEach(function (w, i) { ws.getColumn(1 + i).width = w; });
+
+    var r = 2;
+    days.forEach(function (day) {
+      var date = excelDate(day.date);
+      var events = (day.events || []).slice().sort(function (a, b) { return (a.t || '') < (b.t || '') ? -1 : 1; });
+      events.forEach(function (e) {
+        var ty = e.ty;
+        ws.getCell(r, 1).value = date; ws.getCell(r, 1).numFmt = DATE_FMT;
+        ws.getCell(r, 2).value = e.t;
+        ws.getCell(r, 3).value = e.by;
+        ws.getCell(r, 4).value = TYPE_LABELS[ty] || ty;
+        if (MILK_TYPES[ty] && typeof e.ml === 'number') {
+          ws.getCell(r, 5).value = e.ml;
+          if (typeof e.leftover === 'number') ws.getCell(r, 6).value = e.leftover;
+          ws.getCell(r, 7).value = { formula: 'IF(E' + r + '="","",E' + r + '-N(F' + r + '))' };
+        }
+        if (ty === 'nappy' && e.nap) ws.getCell(r, 8).value = e.nap;
+        if (e.side) ws.getCell(r, 9).value = e.side;
+        if ((ty === 'breast' || ty === 'pump' || ty === 'pp') && typeof e.dur === 'number') ws.getCell(r, 10).value = e.dur;
+        if (ty === 'sleep') {
+          if (e.end) ws.getCell(r, 11).value = e.end;
+          if (typeof e.dur === 'number' && e.end) ws.getCell(r, 12).value = e.dur;
+        }
+        if (ty === 'med_other' && e.med) ws.getCell(r, 13).value = e.med;
+        if (e.note) { ws.getCell(r, 14).value = e.note; ws.getCell(r, 14).alignment = LEFT_WRAP; }
+        for (var col = 1; col <= EVLOG_HEADERS.length; col++) {
+          var cell = ws.getCell(r, col);
+          cell.font = col === 7 ? FORMULA_FONT : BODY_FONT;
+          if (r % 2 === 1) cell.fill = DATA_FILL;
+        }
+        r++;
+      });
+    });
+    ws.views = [{ state: 'frozen', ySplit: 1 }];
+    return r - 1;
+  }
+
+  // ---------- Sheet: Daily summary ----------
+  var DAILY_HEADERS = ['Date (cycle day starts 09:00)', 'ISO week', 'C&G ml', 'EBM ml', 'Mixed ml',
+    'Bottle total ml (net)', 'Breast sessions', 'Breast minutes', 'Pump sessions', 'Pump minutes',
+    'Power pump sessions', 'Power pump minutes', 'Wet nappies', 'Soiled nappies', 'Vomit / posset',
+    'Vitamin D logs', 'Gaviscon feeds', 'Bottles with leftover noted', 'Sleep minutes', 'Naps logged', 'All events'];
+
+  function buildDailySummary(wb, days, evlogLastRow) {
+    var ws = wb.addWorksheet('Daily summary');
+    DAILY_HEADERS.forEach(function (h, i) {
+      var c = ws.getCell(1, 1 + i);
+      c.value = h; c.font = HEADER_FONT; c.fill = HEADER_FILL; c.alignment = CENTER;
+    });
+    ws.getColumn(1).width = 24;
+    for (var col = 2; col <= DAILY_HEADERS.length; col++) ws.getColumn(col).width = 15;
+
+    var EL = "'Event log'!";
+    function rng(c) { return EL + '$' + c + '$2:$' + c + '$' + evlogLastRow; }
+    var A = rng('A'), D = rng('D'), G = rng('G'), H = rng('H'), J = rng('J'), L = rng('L');
+    var F = rng('F');
+
+    days.forEach(function (day, i) {
+      var r = i + 2;
+      var date = excelDate(day.date);
+      ws.getCell(r, 1).value = date; ws.getCell(r, 1).numFmt = DATE_FMT; ws.getCell(r, 1).font = INPUT_FONT;
+      ws.getCell(r, 2).value = isoWeek(day.date); ws.getCell(r, 2).font = FORMULA_FONT;
+
+      function sumifs(rngG, typeLabel) { return 'SUMIFS(' + rngG + ',' + A + ',$A' + r + ',' + D + ',"' + typeLabel + '")'; }
+      function countifs(typeLabel) { return 'COUNTIFS(' + A + ',$A' + r + ',' + D + ',"' + typeLabel + '")'; }
+
+      ws.getCell(r, 3).value = { formula: sumifs(G, 'C&G') };
+      ws.getCell(r, 4).value = { formula: sumifs(G, 'EBM') };
+      ws.getCell(r, 5).value = { formula: sumifs(G, 'Mixed') };
+      ws.getCell(r, 6).value = { formula: 'C' + r + '+D' + r + '+E' + r };
+      ws.getCell(r, 7).value = { formula: countifs('Breast') };
+      ws.getCell(r, 8).value = { formula: sumifs(J, 'Breast') };
+      ws.getCell(r, 9).value = { formula: countifs('Pump') };
+      ws.getCell(r, 10).value = { formula: sumifs(J, 'Pump') };
+      ws.getCell(r, 11).value = { formula: countifs('Power pump') };
+      ws.getCell(r, 12).value = { formula: sumifs(J, 'Power pump') };
+      ws.getCell(r, 13).value = { formula: 'COUNTIFS(' + A + ',$A' + r + ',' + H + ',"Wet")+COUNTIFS(' + A + ',$A' + r + ',' + H + ',"Wet+Soiled")' };
+      ws.getCell(r, 14).value = { formula: 'COUNTIFS(' + A + ',$A' + r + ',' + H + ',"Soiled")+COUNTIFS(' + A + ',$A' + r + ',' + H + ',"Wet+Soiled")' };
+      ws.getCell(r, 15).value = { formula: countifs('Sick') };
+      ws.getCell(r, 16).value = { formula: countifs('Vitamin D') };
+      ws.getCell(r, 17).value = { formula: countifs('Gaviscon') };
+      ws.getCell(r, 18).value = { formula: 'COUNTIFS(' + A + ',$A' + r + ',' + F + ',">0")' };
+      ws.getCell(r, 19).value = { formula: sumifs(L, 'Sleep') };
+      ws.getCell(r, 20).value = { formula: 'COUNTIFS(' + A + ',$A' + r + ',' + D + ',"Sleep",' + L + ',">0")' };
+      ws.getCell(r, 21).value = { formula: 'COUNTIFS(' + A + ',$A' + r + ')' };
+
+      for (var col2 = 1; col2 <= DAILY_HEADERS.length; col2++) {
+        var cell = ws.getCell(r, col2);
+        if (col2 > 2) cell.font = FORMULA_FONT;
+        if (i % 2 === 1) cell.fill = DATA_FILL;
+      }
+    });
+    ws.views = [{ state: 'frozen', ySplit: 1 }];
+    return days.length + 1;
+  }
+
+  // ---------- Sheet: Weekly summary ----------
+  var WEEKLY_HEADERS = ['ISO week', 'From', 'To', 'Days logged', 'C&G ml', 'EBM ml', 'Mixed ml',
+    'Bottle ml (net)', 'Breast sessions', 'Pump sessions', 'Power pump sessions', 'Wet nappies',
+    'Soiled nappies', 'Vomit', 'Sleep minutes', 'Naps logged', 'Avg bottle ml / logged day'];
+
+  function buildWeeklySummary(wb, days, dailyLastRow) {
+    var ws = wb.addWorksheet('Weekly summary');
+    WEEKLY_HEADERS.forEach(function (h, i) {
+      var c = ws.getCell(1, 1 + i);
+      c.value = h; c.font = HEADER_FONT; c.fill = HEADER_FILL; c.alignment = CENTER;
+    });
+    ws.getColumn(1).width = 12;
+    for (var col = 2; col <= WEEKLY_HEADERS.length; col++) ws.getColumn(col).width = 15;
+
+    var weeks = {}, wkOrder = [];
+    days.forEach(function (day) {
+      var wk = isoWeek(day.date);
+      if (!weeks[wk]) { weeks[wk] = []; wkOrder.push(wk); }
+      weeks[wk].push(day.date);
+    });
+    wkOrder.sort();
+
+    var DS = "'Daily summary'!";
+    function rng(c) { return DS + '$' + c + '$2:$' + c + '$' + dailyLastRow; }
+    var B = rng('B');
+
+    wkOrder.forEach(function (wk, i) {
+      var r = i + 2;
+      var dates = weeks[wk].slice().sort();
+      ws.getCell(r, 1).value = wk; ws.getCell(r, 1).font = FORMULA_FONT;
+      ws.getCell(r, 2).value = excelDate(dates[0]); ws.getCell(r, 2).numFmt = DATE_FMT;
+      ws.getCell(r, 3).value = excelDate(dates[dates.length - 1]); ws.getCell(r, 3).numFmt = DATE_FMT;
+      ws.getCell(r, 4).value = dates.length;
+      ws.getCell(r, 5).value = { formula: 'SUMIFS(' + rng('C') + ',' + B + ',$A' + r + ')' };
+      ws.getCell(r, 6).value = { formula: 'SUMIFS(' + rng('D') + ',' + B + ',$A' + r + ')' };
+      ws.getCell(r, 7).value = { formula: 'SUMIFS(' + rng('E') + ',' + B + ',$A' + r + ')' };
+      ws.getCell(r, 8).value = { formula: 'E' + r + '+F' + r + '+G' + r };
+      ws.getCell(r, 9).value = { formula: 'SUMIFS(' + rng('G') + ',' + B + ',$A' + r + ')' };
+      ws.getCell(r, 10).value = { formula: 'SUMIFS(' + rng('I') + ',' + B + ',$A' + r + ')' };
+      ws.getCell(r, 11).value = { formula: 'SUMIFS(' + rng('K') + ',' + B + ',$A' + r + ')' };
+      ws.getCell(r, 12).value = { formula: 'SUMIFS(' + rng('M') + ',' + B + ',$A' + r + ')' };
+      ws.getCell(r, 13).value = { formula: 'SUMIFS(' + rng('N') + ',' + B + ',$A' + r + ')' };
+      ws.getCell(r, 14).value = { formula: 'SUMIFS(' + rng('O') + ',' + B + ',$A' + r + ')' };
+      ws.getCell(r, 15).value = { formula: 'SUMIFS(' + rng('S') + ',' + B + ',$A' + r + ')' };
+      ws.getCell(r, 16).value = { formula: 'SUMIFS(' + rng('T') + ',' + B + ',$A' + r + ')' };
+      ws.getCell(r, 17).value = { formula: 'IF(D' + r + '=0,0,H' + r + '/D' + r + ')' };
+      for (var col2 = 1; col2 <= WEEKLY_HEADERS.length; col2++) {
+        var cell = ws.getCell(r, col2);
+        if (col2 > 1) cell.font = FORMULA_FONT;
+        if (i % 2 === 1) cell.fill = DATA_FILL;
+      }
+    });
+    return ws;
+  }
+
+  // ---------- Sheet: Who logged what ----------
+  function buildWhoLogged(wb, days, evlogLastRow) {
+    var ws = wb.addWorksheet('Who logged what');
+    var headers = ['Caregiver', 'Events logged', 'Bottle / milk logs', 'Breast logs',
+      'Nappy logs', 'Pump / PP logs', 'Sleep logs', '% of all events'];
+    headers.forEach(function (h, i) {
+      var c = ws.getCell(1, 1 + i);
+      c.value = h; c.font = HEADER_FONT; c.fill = HEADER_FILL; c.alignment = CENTER;
+    });
+    var widths = [16, 14, 16, 12, 12, 14, 12, 14];
+    widths.forEach(function (w, i) { ws.getColumn(1 + i).width = w; });
+
+    var loggers = [], seen = {};
+    days.forEach(function (day) {
+      (day.events || []).forEach(function (e) {
+        var by = e.by || 'Unknown';
+        if (!seen[by]) { seen[by] = true; loggers.push(by); }
+      });
+    });
+
+    var EL = "'Event log'!";
+    var C = EL + '$C$2:$C$' + evlogLastRow;
+    var D = EL + '$D$2:$D$' + evlogLastRow;
+    var total = 'COUNTA(' + C + ')';
+    loggers.forEach(function (name, i) {
+      var r = i + 2;
+      ws.getCell(r, 1).value = name; ws.getCell(r, 1).font = BODY_FONT;
+      ws.getCell(r, 2).value = { formula: 'COUNTIF(' + C + ',$A' + r + ')' }; ws.getCell(r, 2).font = FORMULA_FONT;
+      ws.getCell(r, 3).value = { formula: 'COUNTIFS(' + C + ',$A' + r + ',' + D + ',"C&G")+COUNTIFS(' + C + ',$A' + r + ',' + D + ',"EBM")+COUNTIFS(' + C + ',$A' + r + ',' + D + ',"Mixed")' };
+      ws.getCell(r, 3).font = FORMULA_FONT;
+      ws.getCell(r, 4).value = { formula: 'COUNTIFS(' + C + ',$A' + r + ',' + D + ',"Breast")' }; ws.getCell(r, 4).font = FORMULA_FONT;
+      ws.getCell(r, 5).value = { formula: 'COUNTIFS(' + C + ',$A' + r + ',' + D + ',"Nappy")' }; ws.getCell(r, 5).font = FORMULA_FONT;
+      ws.getCell(r, 6).value = { formula: 'COUNTIFS(' + C + ',$A' + r + ',' + D + ',"Pump")+COUNTIFS(' + C + ',$A' + r + ',' + D + ',"Power pump")' };
+      ws.getCell(r, 6).font = FORMULA_FONT;
+      ws.getCell(r, 7).value = { formula: 'COUNTIFS(' + C + ',$A' + r + ',' + D + ',"Sleep")' }; ws.getCell(r, 7).font = FORMULA_FONT;
+      ws.getCell(r, 8).value = { formula: 'B' + r + '/' + total }; ws.getCell(r, 8).font = FORMULA_FONT;
+      ws.getCell(r, 8).numFmt = '0.0%';
+      if (i % 2 === 1) { for (var col = 1; col <= 8; col++) ws.getCell(r, col).fill = DATA_FILL; }
+    });
+    return ws;
+  }
+
+  // ---------- Sheet: Leftover adjustments ----------
+  function buildLeftoverSheet(wb, days) {
+    var ws = wb.addWorksheet('Leftover adjustments');
+    var headers = ['Date', 'Time', 'Type', 'Logged by', 'Offered ml', 'Leftover ml', 'Taken ml'];
+    headers.forEach(function (h, i) {
+      var c = ws.getCell(1, 1 + i);
+      c.value = h; c.font = HEADER_FONT; c.fill = HEADER_FILL; c.alignment = CENTER;
+    });
+    var widths = [14, 9, 10, 14, 11, 11, 10];
+    widths.forEach(function (w, i) { ws.getColumn(1 + i).width = w; });
+
+    var r = 2;
+    days.forEach(function (day) {
+      var date = excelDate(day.date);
+      var events = (day.events || []).slice().sort(function (a, b) { return (a.t || '') < (b.t || '') ? -1 : 1; });
+      events.forEach(function (e) {
+        if (MILK_TYPES[e.ty] && typeof e.leftover === 'number' && e.leftover > 0) {
+          ws.getCell(r, 1).value = date; ws.getCell(r, 1).numFmt = DATE_FMT;
+          ws.getCell(r, 2).value = e.t;
+          ws.getCell(r, 3).value = TYPE_LABELS[e.ty] || e.ty;
+          ws.getCell(r, 4).value = e.by;
+          ws.getCell(r, 5).value = e.ml;
+          ws.getCell(r, 6).value = e.leftover;
+          ws.getCell(r, 7).value = { formula: 'E' + r + '-F' + r };
+          for (var col = 1; col <= 7; col++) {
+            var cell = ws.getCell(r, col);
+            cell.font = col === 7 ? FORMULA_FONT : BODY_FONT;
+            if (r % 2 === 1) cell.fill = DATA_FILL;
+          }
+          r++;
+        }
+      });
+    });
+    if (r === 2) {
+      ws.getCell(2, 1).value = 'No leftover amounts recorded yet.'; ws.getCell(2, 1).font = SOURCE_FONT;
+      ws.mergeCells('A2:G2');
+    }
+    return ws;
+  }
+
+  // ---------- Sheet: Sleep log ----------
+  function buildSleepSheet(wb, days) {
+    var ws = wb.addWorksheet('Sleep log');
+    var headers = ['Date', 'Start', 'End', 'Duration (min)', 'Duration', 'Logged by', 'Status'];
+    headers.forEach(function (h, i) {
+      var c = ws.getCell(1, 1 + i);
+      c.value = h; c.font = HEADER_FONT; c.fill = HEADER_FILL; c.alignment = CENTER;
+    });
+    var widths = [14, 9, 9, 15, 12, 14, 12];
+    widths.forEach(function (w, i) { ws.getColumn(1 + i).width = w; });
+
+    var r = 2;
+    days.forEach(function (day) {
+      var date = excelDate(day.date);
+      var events = (day.events || []).slice().sort(function (a, b) { return (a.t || '') < (b.t || '') ? -1 : 1; });
+      events.forEach(function (e) {
+        if (e.ty !== 'sleep') return;
+        ws.getCell(r, 1).value = date; ws.getCell(r, 1).numFmt = DATE_FMT;
+        ws.getCell(r, 2).value = e.t;
+        ws.getCell(r, 6).value = e.by;
+        if (e.end && typeof e.dur === 'number') {
+          ws.getCell(r, 3).value = e.end;
+          ws.getCell(r, 4).value = e.dur;
+          ws.getCell(r, 5).value = { formula: 'TEXT(INT(D' + r + '/60),"0")&"h "&TEXT(MOD(D' + r + ',60),"0")&"m"' };
+          ws.getCell(r, 7).value = 'Completed';
+        } else {
+          ws.getCell(r, 7).value = 'Still open at export time';
+        }
+        for (var col = 1; col <= 7; col++) {
+          var cell = ws.getCell(r, col);
+          cell.font = col === 5 ? FORMULA_FONT : BODY_FONT;
+          if (r % 2 === 1) cell.fill = DATA_FILL;
+        }
+        r++;
+      });
+    });
+    if (r === 2) {
+      ws.getCell(2, 1).value = 'No naps logged yet.'; ws.getCell(2, 1).font = SOURCE_FONT;
+      ws.mergeCells('A2:G2');
+    }
+    return ws;
+  }
+
+  // ---------- Sheet: Soiled by time of day ----------
+  function buildSoiledByHour(wb, days) {
+    var ws = wb.addWorksheet('Soiled by time of day', { views: [{ showGridLines: false }] });
+    ws.mergeCells('A1:C1');
+    ws.getCell('A1').value = 'Soiled nappies — by hour logged';
+    ws.getCell('A1').font = SECTION_FONT;
+    ws.mergeCells('A2:C2');
+    ws.getCell('A2').value = 'Times are when the soiled nappy was logged, bucketed by the hour. Useful for ' +
+      'spotting a pattern (e.g. usually after the first morning feed).';
+    ws.getCell('A2').font = BODY_FONT;
+    ws.getCell('A2').alignment = LEFT_WRAP;
+    ws.getRow(2).height = 30;
+
+    var counts = new Array(24).fill(0);
+    days.forEach(function (day) {
+      (day.events || []).forEach(function (e) {
+        if (e.ty === 'nappy' && (e.nap === 'Soiled' || e.nap === 'Wet+Soiled') && e.t) {
+          var hour = parseInt(e.t.split(':')[0], 10);
+          if (!isNaN(hour) && hour >= 0 && hour < 24) counts[hour]++;
+        }
+      });
+    });
+
+    var headers = ['Hour', 'Soiled nappies logged'];
+    var HEADER_ROW = 4;
+    headers.forEach(function (h, i) {
+      var c = ws.getCell(HEADER_ROW, 1 + i);
+      c.value = h; c.font = HEADER_FONT; c.fill = HEADER_FILL; c.alignment = CENTER;
+    });
+    for (var h = 0; h < 24; h++) {
+      var r = HEADER_ROW + 1 + h;
+      var hh = h < 10 ? '0' + h : '' + h;
+      ws.getCell(r, 1).value = hh + ':00–' + hh + ':59'; ws.getCell(r, 1).font = BODY_FONT;
+      ws.getCell(r, 2).value = counts[h]; ws.getCell(r, 2).font = BODY_FONT;
+      if (h % 2 === 1) { ws.getCell(r, 1).fill = DATA_FILL; ws.getCell(r, 2).fill = DATA_FILL; }
+    }
+    ws.getColumn(1).width = 16;
+    ws.getColumn(2).width = 20;
+    return ws;
+  }
+
+  // ---------- Sheet: Growth data (table + reference grid; no embedded chart) ----------
+  var WEEKLY_LMS = [
+    [0, 0.3809, 3.2322, 0.14171], [1, 0.2671, 3.3388, 0.14600], [2, 0.2304, 3.5693, 0.14339],
+    [3, 0.2024, 3.8352, 0.14060], [4, 0.1789, 4.0987, 0.13805], [5, 0.1582, 4.3476, 0.13583],
+    [6, 0.1395, 4.5793, 0.13392], [7, 0.1224, 4.7950, 0.13228], [8, 0.1065, 4.9959, 0.13087],
+    [9, 0.0918, 5.1842, 0.12966], [10, 0.0779, 5.3618, 0.12861], [11, 0.0648, 5.5295, 0.12770],
+    [12, 0.0525, 5.6883, 0.12691], [13, 0.0407, 5.8393, 0.12622]
+  ];
+  var MONTHLY_LMS = [
+    [4, -0.0050, 6.4237, 0.12402], [5, -0.0430, 6.8985, 0.12274], [6, -0.0756, 7.2970, 0.12204],
+    [7, -0.1039, 7.6422, 0.12178], [8, -0.1288, 7.9487, 0.12181], [9, -0.1507, 8.2254, 0.12199],
+    [10, -0.1700, 8.4800, 0.12223], [11, -0.1872, 8.7192, 0.12247], [12, -0.2024, 8.9481, 0.12268],
+    [13, -0.2158, 9.1699, 0.12283], [14, -0.2278, 9.3870, 0.12294], [15, -0.2384, 9.6008, 0.12299],
+    [16, -0.2478, 9.8124, 0.12303], [17, -0.2562, 10.0226, 0.12306], [18, -0.2637, 10.2315, 0.12309],
+    [19, -0.2703, 10.4393, 0.12315], [20, -0.2762, 10.6464, 0.12323], [21, -0.2815, 10.8534, 0.12335],
+    [22, -0.2862, 11.0608, 0.12350], [23, -0.2903, 11.2688, 0.12369], [24, -0.2941, 11.4775, 0.12390]
+  ];
+  var DAYS_PER_MONTH = 30.4375;
+  var WEEKLY_SRC = 'WHO weekly weight-for-age LMS table, girls, birth-13 weeks (cdn.who.int .../weight-for-age/wfa-girls-0-13-zscores.pdf)';
+  var MONTHLY_SRC = 'WHO monthly weight-for-age LMS table, girls, birth-5 years - months 4-24 used here (cdn.who.int .../weight-for-age/wfa-girls-0-5-zscores.pdf)';
+
+  // standard normal inverse CDF (Acklam's algorithm) — only needed to compute the 9 centile Z's client-side
+  function normInv(p) {
+    var a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02, 1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00];
+    var b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02, 6.680131188771972e+01, -1.328068155288572e+01];
+    var c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00, -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00];
+    var d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00, 3.754408661907416e+00];
+    var pLow = 0.02425, pHigh = 1 - pLow, q, r;
+    if (p < pLow) {
+      q = Math.sqrt(-2 * Math.log(p));
+      return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) /
+        ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+    } else if (p <= pHigh) {
+      q = p - 0.5; r = q * q;
+      return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q /
+        (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
+    } else {
+      q = Math.sqrt(-2 * Math.log(1 - p));
+      return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) /
+        ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+    }
+  }
+
+  function buildGrowthSheet(wb, dobStr, measurements) {
+    var ws = wb.addWorksheet('Growth data', { views: [{ showGridLines: false }] });
+    ws.mergeCells('A1:H1');
+    ws.getCell('A1').value = "Lolu - growth data (weight-for-age vs WHO Child Growth Standards)";
+    ws.getCell('A1').font = TITLE_FONT;
+    ws.mergeCells('A2:H2');
+    ws.getCell('A2').value = 'UK-WHO 9-centile weight-for-age curves for girls, applied to Lolu\'s own logged ' +
+      'weights. Built from the WHO Child Growth Standards LMS parameters ' +
+      '(who.int/tools/child-growth-standards). A growth reference, not a clinical assessment. ' +
+      'The live trend chart is on the app\'s Growth tab — select the data below in Excel to chart it yourself.';
+    ws.getCell('A2').font = SUBTITLE_FONT;
+    ws.getCell('A2').alignment = LEFT_WRAP;
+    ws.getRow(2).height = 40;
+
+    var dob = excelDate(dobStr);
+    ws.getCell('A4').value = 'Date of birth'; ws.getCell('A4').font = LABEL_FONT;
+    ws.getCell('B4').value = dob; ws.getCell('B4').font = INPUT_FONT; ws.getCell('B4').numFmt = DATE_FMT;
+
+    var measHeaders = ['Date', 'Age (days)', 'Age (weeks)', 'Weight (kg)', 'Z-score (SD)', 'Percentile', 'UK-WHO centile band', 'Note'];
+    var HEADER_ROW = 6;
+    measHeaders.forEach(function (h, i) {
+      var c = ws.getCell(HEADER_ROW, 1 + i);
+      c.value = h; c.font = HEADER_FONT; c.fill = HEADER_FILL; c.alignment = CENTER;
+    });
+
+    var FIRST_DATA_ROW = HEADER_ROW + 1;
+    var LAST_DATA_ROW = FIRST_DATA_ROW + Math.max(measurements.length, 1) - 1;
+
+    measurements.forEach(function (m, i) {
+      var r = FIRST_DATA_ROW + i;
+      var date = excelDate(m.date);
+      ws.getCell(r, 1).value = date; ws.getCell(r, 1).numFmt = DATE_FMT; ws.getCell(r, 1).font = INPUT_FONT;
+      ws.getCell(r, 2).value = { formula: 'A' + r + '-$B$4' }; ws.getCell(r, 2).font = FORMULA_FONT;
+      ws.getCell(r, 3).value = { formula: 'B' + r + '/7' }; ws.getCell(r, 3).font = FORMULA_FONT;
+      var wcell = ws.getCell(r, 4); wcell.value = m.kg; wcell.font = INPUT_FONT; wcell.numFmt = '0.000';
+      ws.getCell(r, 14).value = { formula: 'MATCH(C' + r + ',RefAge,1)' }; ws.getCell(r, 14).font = WORKING_FONT;
+      ws.getCell(r, 15).value = { formula: 'MIN(N' + r + '+1,COUNT(RefAge))' }; ws.getCell(r, 15).font = WORKING_FONT;
+      ws.getCell(r, 16).value = { formula: 'IF(O' + r + '=N' + r + ',0,(C' + r + '-INDEX(RefAge,N' + r + '))/(INDEX(RefAge,O' + r + ')-INDEX(RefAge,N' + r + ')))' };
+      ws.getCell(r, 16).font = WORKING_FONT;
+      ws.getCell(r, 17).value = { formula: 'INDEX(RefL,N' + r + ')+P' + r + '*(INDEX(RefL,O' + r + ')-INDEX(RefL,N' + r + '))' };
+      ws.getCell(r, 17).font = WORKING_FONT;
+      ws.getCell(r, 18).value = { formula: 'INDEX(RefM,N' + r + ')+P' + r + '*(INDEX(RefM,O' + r + ')-INDEX(RefM,N' + r + '))' };
+      ws.getCell(r, 18).font = WORKING_FONT;
+      ws.getCell(r, 19).value = { formula: 'INDEX(RefS,N' + r + ')+P' + r + '*(INDEX(RefS,O' + r + ')-INDEX(RefS,N' + r + '))' };
+      ws.getCell(r, 19).font = WORKING_FONT;
+      ws.getCell(r, 5).value = { formula: 'IF(ABS(Q' + r + ')<0.0001,LN(D' + r + '/R' + r + ')/S' + r + ',((D' + r + '/R' + r + ')^Q' + r + '-1)/(Q' + r + '*S' + r + '))' };
+      ws.getCell(r, 5).font = FORMULA_FONT; ws.getCell(r, 5).numFmt = '+0.00;-0.00';
+      ws.getCell(r, 6).value = { formula: 'NORMSDIST(E' + r + ')*100' }; ws.getCell(r, 6).font = FORMULA_FONT;
+      ws.getCell(r, 6).numFmt = '0.0"th"';
+      var bandFormula = 'IF(F' + r + '<0.4,"below 0.4th",IF(F' + r + '<2,"0.4th-2nd",IF(F' + r + '<9,"2nd-9th",' +
+        'IF(F' + r + '<25,"9th-25th",IF(F' + r + '<50,"25th-50th",IF(F' + r + '<75,"50th-75th",' +
+        'IF(F' + r + '<91,"75th-91st",IF(F' + r + '<98,"91st-98th",IF(F' + r + '<99.6,"98th-99.6th","above 99.6th")))))))))';
+      ws.getCell(r, 7).value = { formula: bandFormula }; ws.getCell(r, 7).font = FORMULA_FONT;
+      ws.getCell(r, 8).value = m.note || ''; ws.getCell(r, 8).font = BODY_FONT;
+      for (var col = 1; col <= 8; col++) ws.getCell(r, col).fill = DATA_FILL;
+    });
+
+    var workHeaders = ['lo idx', 'hi idx', 'frac', 'L (interp)', 'M (interp)', 'S (interp)'];
+    workHeaders.forEach(function (h, i) {
+      var c = ws.getCell(HEADER_ROW, 14 + i);
+      c.value = h; c.font = { name: 'Arial', size: 9, bold: true, italic: true, color: { argb: 'FF8C97A6' } };
+      c.fill = WORKING_FILL; c.alignment = CENTER;
+    });
+    for (var rr = FIRST_DATA_ROW; rr <= LAST_DATA_ROW; rr++) {
+      for (var cc = 14; cc <= 19; cc++) ws.getCell(rr, cc).fill = WORKING_FILL;
+    }
+
+    var widths = { A: 16, B: 11, C: 12, D: 12, E: 13, F: 11, G: 17, H: 22 };
+    Object.keys(widths).forEach(function (col) { ws.getColumn(col).width = widths[col]; });
+    ['N', 'O', 'P', 'Q', 'R', 'S'].forEach(function (col) { ws.getColumn(col).width = 11; });
+    ['I', 'J', 'K', 'L', 'M'].forEach(function (col) { ws.getColumn(col).width = 13; });
+
+    ws.getCell('A17').value = 'How to read this sheet'; ws.getCell('A17').font = SECTION_FONT;
+    var notes = [
+      ['A18', 'Percentile: the share of WHO\'s reference population of girls the same age who weigh ' +
+        'less than Lolu at that measurement. 50th = exactly average for age.'],
+      ['A19', 'UK-WHO centile band: the NHS Red Book / RCPCH growth chart plots 9 centile lines ' +
+        '(0.4th, 2nd, 9th, 25th, 50th, 75th, 91st, 98th, 99.6th) rather than WHO\'s plain SD lines. ' +
+        'This sheet computes the exact percentile mathematically, then reports which UK band it ' +
+        'falls in, so the number and the band always agree.'],
+      ['A20', 'Method: WHO publishes each reference curve as three parameters per age - L (skew), M ' +
+        '(median), S (spread), the "LMS method". Z = ((weight/M)^L - 1)/(L*S), percentile = ' +
+        'Phi(Z). L/M/S are linearly interpolated between the nearest published ages.'],
+      ['A21', 'Data source: WHO Child Growth Standards, girls, weight-for-age (who.int/tools/' +
+        'child-growth-standards). Girls\' standard used throughout, per "her growth chart".'],
+      ['A22', 'This sheet regenerates fresh every time you export from the app, from every weight ' +
+        'logged in the app\'s Growth tab.']
+    ];
+    notes.forEach(function (pair) {
+      var cell = pair[0], text = pair[1];
+      ws.getCell(cell).value = text; ws.getCell(cell).font = BODY_FONT; ws.getCell(cell).alignment = LEFT_WRAP;
+      var row = parseInt(cell.slice(1), 10);
+      ws.mergeCells(row, 1, row, 8);
+      ws.getRow(row).height = (row === 19 || row === 20) ? 46 : 30;
+    });
+
+    var GRID_TITLE_ROW = 26;
+    ws.getCell(GRID_TITLE_ROW, 1).value = 'WHO Child Growth Standards - girls, weight-for-age reference grid';
+    ws.getCell(GRID_TITLE_ROW, 1).font = SECTION_FONT;
+    ws.mergeCells(GRID_TITLE_ROW, 1, GRID_TITLE_ROW, 8);
+
+    var centileCols = ['0.4th', '2nd', '9th', '25th', '50th', '75th', '91st', '98th', '99.6th'];
+    var centileP = [0.004, 0.02, 0.09, 0.25, 0.5, 0.75, 0.91, 0.98, 0.996];
+    var centileZ = centileP.map(function (p) { return Math.round(normInv(p) * 10000) / 10000; });
+
+    var Z_ROW = GRID_TITLE_ROW + 1;
+    ws.getCell(Z_ROW, 1).value = 'Standard normal Z for each UK-WHO centile:';
+    ws.getCell(Z_ROW, 1).font = LEGEND_FONT;
+    ws.mergeCells(Z_ROW, 1, Z_ROW, 5);
+    var Z_FIRST_COL = 6;
+    centileCols.forEach(function (lbl, i) {
+      var c = ws.getCell(Z_ROW, Z_FIRST_COL + i);
+      c.value = centileZ[i]; c.font = INPUT_FONT; c.numFmt = '+0.0000;-0.0000'; c.alignment = { horizontal: 'center' };
+    });
+
+    var HEADER_ROW2 = Z_ROW + 1;
+    var gridHeaders = ['Age', 'Age (weeks)', 'L', 'M', 'S'].concat(centileCols.map(function (c) { return c + ' centile (kg)'; })).concat(['Source']);
+    gridHeaders.forEach(function (h, i) {
+      var cell = ws.getCell(HEADER_ROW2, 1 + i);
+      cell.value = h; cell.font = HEADER_FONT; cell.fill = HEADER_FILL; cell.alignment = CENTER;
+    });
+
+    var gridRows = [];
+    WEEKLY_LMS.forEach(function (row) { gridRows.push(['Week ' + row[0], row[0], row[1], row[2], row[3], WEEKLY_SRC]); });
+    MONTHLY_LMS.forEach(function (row) {
+      var ageWeeks = Math.round((row[0] * DAYS_PER_MONTH / 7.0) * 1000) / 1000;
+      gridRows.push(['Month ' + row[0], ageWeeks, row[1], row[2], row[3], MONTHLY_SRC]);
+    });
+
+    var GRID_FIRST_ROW = HEADER_ROW2 + 1;
+    var GRID_LAST_ROW = GRID_FIRST_ROW + gridRows.length - 1;
+
+    gridRows.forEach(function (row, i) {
+      var r = GRID_FIRST_ROW + i;
+      var label = row[0], ageWk = row[1], L = row[2], M = row[3], S = row[4], source = row[5];
+      ws.getCell(r, 1).value = label; ws.getCell(r, 1).font = INPUT_FONT;
+      ws.getCell(r, 2).value = ageWk; ws.getCell(r, 2).font = INPUT_FONT; ws.getCell(r, 2).numFmt = '0.000';
+      ws.getCell(r, 3).value = L; ws.getCell(r, 3).font = INPUT_FONT; ws.getCell(r, 3).numFmt = '0.0000';
+      ws.getCell(r, 4).value = M; ws.getCell(r, 4).font = INPUT_FONT; ws.getCell(r, 4).numFmt = '0.0000';
+      ws.getCell(r, 5).value = S; ws.getCell(r, 5).font = INPUT_FONT; ws.getCell(r, 5).numFmt = '0.00000';
+      for (var j = 0; j < 9; j++) {
+        var col = 6 + j;
+        var colLet = colLetter(col);
+        var zLet = colLetter(Z_FIRST_COL + j);
+        var formula = 'IF(ABS($C' + r + ')<0.0001,$D' + r + '*EXP(' + zLet + '$' + Z_ROW + '*$E' + r + '),' +
+          '$D' + r + '*(1+$C' + r + '*$E' + r + '*' + zLet + '$' + Z_ROW + ')^(1/$C' + r + '))';
+        var cell = ws.getCell(r, col);
+        cell.value = { formula: formula }; cell.font = FORMULA_FONT; cell.numFmt = '0.00';
+      }
+      ws.getCell(r, 15).value = source; ws.getCell(r, 15).font = SOURCE_FONT;
+      if (i % 2 === 1) { for (var col2 = 1; col2 <= 15; col2++) ws.getCell(r, col2).fill = DATA_FILL; }
+    });
+
+    wb.definedNames.add("'Growth data'!$B$" + GRID_FIRST_ROW + ":$B$" + GRID_LAST_ROW, 'RefAge');
+    wb.definedNames.add("'Growth data'!$C$" + GRID_FIRST_ROW + ":$C$" + GRID_LAST_ROW, 'RefL');
+    wb.definedNames.add("'Growth data'!$D$" + GRID_FIRST_ROW + ":$D$" + GRID_LAST_ROW, 'RefM');
+    wb.definedNames.add("'Growth data'!$E$" + GRID_FIRST_ROW + ":$E$" + GRID_LAST_ROW, 'RefS');
+
+    return ws;
+  }
+
+  // ---------- Main ----------
+  async function buildWorkbook(days, dob, measurements) {
+    days = days.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+    measurements = (measurements || []).slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+    var nEvents = days.reduce(function (n, d) { return n + (d.events || []).length; }, 0);
+    var generatedAt = new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    var wb = new ExcelJS.Workbook();
+    wb.creator = "Lolu's Log";
+    wb.created = new Date();
+
+    buildIntroSheet(wb, generatedAt, dob, days.length, nEvents);
+    var evlogLastRow = buildEventLog(wb, days);
+    var dailyLastRow = buildDailySummary(wb, days, evlogLastRow);
+    buildWeeklySummary(wb, days, dailyLastRow);
+    buildWhoLogged(wb, days, evlogLastRow);
+    buildLeftoverSheet(wb, days);
+    buildSleepSheet(wb, days);
+    buildSoiledByHour(wb, days);
+    buildGrowthSheet(wb, dob, measurements);
+
+    return wb;
+  }
+
+  function fetchAllDaysForExport(cb){
+    db.from('days').select('*').order('date', {ascending:true}).range(0, 9999).then(function(res){
+      cb((res.data || []).filter(function(d){ return d && d.date; }));
+    }).catch(function(){ cb(null); });
+  }
+
+  function downloadWorkbook(wb, filename){
+    return wb.xlsx.writeBuffer().then(function(buffer){
+      var blob = new Blob([buffer], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+    });
+  }
+
+  function exportWorkbook(){
+    var btn = document.getElementById('exportBtn');
+    if (!btn || btn.disabled) return;
+    if (!db){ toast('Not connected yet — try again shortly.'); return; }
+    if (typeof ExcelJS === 'undefined'){ toast('Export library failed to load — check your connection.'); return; }
+    var oldLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Exporting…';
+    function done(msg){
+      btn.disabled = false; btn.textContent = oldLabel;
+      toast(msg);
+    }
+    fetchAllDaysForExport(function(days){
+      if (!days){ done('Could not load data to export.'); return; }
+      fetchGrowth(function(g){
+        buildWorkbook(days, g.dob || GROWTH_DOB, g.measurements || []).then(function(wb){
+          return downloadWorkbook(wb, 'Lolus-Log-export-'+dstr(new Date())+'.xlsx');
+        }).then(function(){
+          done('Export downloaded');
+        }).catch(function(){
+          done('Export failed — please try again.');
+        });
+      });
+    });
+  }
+
   // ---------- boot ----------
   renderCycLabel(); renderCatGrid(); renderStats(); renderTimeline();
   setInterval(checkCycleRollover, 5*60*1000);
 
   var addWeightBtn = document.getElementById('addWeightBtn');
   if (addWeightBtn) addWeightBtn.addEventListener('click', function(){ openGrowthSheet(null); });
+
+  var exportBtn = document.getElementById('exportBtn');
+  if (exportBtn) exportBtn.addEventListener('click', exportWorkbook);
 
   db = initSupabase();
   if (!db){ setLastLine('Could not connect — check your internet connection and reload.'); }
