@@ -345,6 +345,17 @@
     if (hour < 9) d.setDate(d.getDate()+1);
     return dstr(d);
   }
+  // Chronological sort key for a time-of-day string ("HH:MM") *within one
+  // 09:00-08:59 cycle day*. Events between 00:00-08:59 actually happened
+  // after midnight — later, calendar-wise, than any 09:00-23:59 event in the
+  // same bucket — so plain string/lexicographic comparison of the raw time
+  // (e.g. "00:31" < "22:07") gets them backwards. This pushes that
+  // after-midnight tail to the end of the day instead of the start.
+  function cycleTimeKey(t){
+    var hm = (t||'00:00').split(':');
+    var mins = (Number(hm[0])||0) * 60 + (Number(hm[1])||0);
+    return mins < 540 ? mins + 1440 : mins; // before 09:00 -> sorts after 23:59
+  }
   function fmtDateLabel(iso){
     var d = new Date(iso+'T12:00:00');
     return d.toLocaleDateString(undefined, {weekday:'short', day:'numeric', month:'short'});
@@ -442,7 +453,7 @@
   function renderTimeline(){
     var el = document.getElementById('todayTimeline');
     if (!todayEvents.length){ el.outerHTML = '<div class="timeline" id="todayTimeline"><div class="empty" style="grid-column:1/-1">Nothing logged yet today — tap Log to start.</div></div>'; return; }
-    var sorted = todayEvents.slice().sort(function(a,b){ return a.t < b.t ? 1 : -1; });
+    var sorted = todayEvents.slice().sort(function(a,b){ return cycleTimeKey(b.t) - cycleTimeKey(a.t); });
     el.innerHTML = sorted.map(function(e){
       var d = describeEvent(e);
       return '<div class="trow">'+
@@ -466,7 +477,7 @@
 
   function renderLastLine(){
     if (!todayEvents.length){ setLastLine('Nothing logged yet today.'); return; }
-    var sorted = todayEvents.slice().sort(function(a,b){ return a.t < b.t ? 1 : -1; });
+    var sorted = todayEvents.slice().sort(function(a,b){ return cycleTimeKey(b.t) - cycleTimeKey(a.t); });
     var e = sorted[0], d = describeEvent(e);
     setLastLine('<b>'+(e.by||'Someone')+'</b> logged '+d.title+' <span class="when">· '+e.t+'</span>', d.color);
   }
@@ -599,7 +610,7 @@
     }
 
     html += '<div class="field"><label>Note (optional)</label>'+
-      '<textarea id="noteInput" rows="2" placeholder="e.g. nappy was very heavy, poo was green">'+escText(sheetState.note)+'</textarea></div>';
+      '<textarea id="noteInput" rows="2" placeholder="Anything to note? e.g. heavy nappy">'+escText(sheetState.note)+'</textarea></div>';
 
     html += '<div class="saymsg" id="sheetMsg"></div>';
     html += '<div class="rowbtns"><button class="cancel" id="sheetCancel">Cancel</button><button class="save" id="sheetSave">Save</button></div>';
@@ -1096,7 +1107,7 @@
           var det = card.querySelector('.day-detail');
           if (det.style.display === 'none'){
             var day = historyDays.filter(function(d){ return d.date===card.dataset.date; })[0];
-            var evs = (day.events||[]).slice().sort(function(a,b){ return a.t < b.t ? 1 : -1; });
+            var evs = (day.events||[]).slice().sort(function(a,b){ return cycleTimeKey(b.t) - cycleTimeKey(a.t); });
             det.innerHTML = evs.map(function(e){
               var dd = describeEvent(e);
               return '<div class="trow" style="padding:6px 0"><div class="tdot" style="background:var(--'+dd.color+')"></div>'+
@@ -1494,7 +1505,7 @@
     var r = 2;
     days.forEach(function (day) {
       var date = excelDate(day.date);
-      var events = (day.events || []).slice().sort(function (a, b) { return (a.t || '') < (b.t || '') ? -1 : 1; });
+      var events = (day.events || []).slice().sort(function (a, b) { return cycleTimeKey(a.t) - cycleTimeKey(b.t); });
       events.forEach(function (e) {
         var ty = e.ty;
         ws.getCell(r, 1).value = date; ws.getCell(r, 1).numFmt = DATE_FMT;
@@ -1697,7 +1708,7 @@
     var r = 2;
     days.forEach(function (day) {
       var date = excelDate(day.date);
-      var events = (day.events || []).slice().sort(function (a, b) { return (a.t || '') < (b.t || '') ? -1 : 1; });
+      var events = (day.events || []).slice().sort(function (a, b) { return cycleTimeKey(a.t) - cycleTimeKey(b.t); });
       events.forEach(function (e) {
         if (MILK_TYPES[e.ty] && typeof e.leftover === 'number' && e.leftover > 0) {
           ws.getCell(r, 1).value = date; ws.getCell(r, 1).numFmt = DATE_FMT;
@@ -1737,7 +1748,7 @@
     var r = 2;
     days.forEach(function (day) {
       var date = excelDate(day.date);
-      var events = (day.events || []).slice().sort(function (a, b) { return (a.t || '') < (b.t || '') ? -1 : 1; });
+      var events = (day.events || []).slice().sort(function (a, b) { return cycleTimeKey(a.t) - cycleTimeKey(b.t); });
       events.forEach(function (e) {
         if (e.ty !== 'sleep') return;
         ws.getCell(r, 1).value = date; ws.getCell(r, 1).numFmt = DATE_FMT;
