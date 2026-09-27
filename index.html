@@ -85,6 +85,17 @@
   @media (prefers-reduced-motion: reduce){ section.view.active{ animation:none; } }
   @keyframes fade{ from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;} }
 
+  /* ── Motion — a small hand-picked subset of EaseMotion CSS
+     (MIT licensed: https://github.com/Johhnmarshal/EaseMotion-css),
+     just the timing tokens + keyframes this app actually uses. ── */
+  :root{ --mo-fast:150ms; --mo-med:280ms; --mo-ease:cubic-bezier(.4,0,.2,1); --mo-ease-out:cubic-bezier(0,0,.2,1); --mo-bounce:cubic-bezier(.34,1.56,.64,1); }
+  @keyframes mo-fade-in{ from{opacity:0} to{opacity:1} }
+  @keyframes mo-slide-up{ from{opacity:0; transform:translate3d(0,28px,0)} to{opacity:1; transform:translate3d(0,0,0)} }
+  @keyframes mo-bounce-in{ 0%{transform:scale(.85); opacity:0} 60%{transform:scale(1.03); opacity:1} 100%{transform:scale(1); opacity:1} }
+  @media (prefers-reduced-motion: reduce){
+    .sheet-backdrop.show, .sheet-backdrop.show .sheet, .confirm-box, .trow{ animation:none !important; }
+  }
+
   .stat-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
   .stat{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:14px; box-shadow:var(--shadow); }
   .stat .label{ font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft); font-weight:700; }
@@ -94,7 +105,7 @@
 
   h2.sec{ font-family:'Fraunces', serif; font-size:1rem; font-weight:600; margin:20px 0 8px; }
   .timeline{ display:flex; flex-direction:column; gap:1px; background:var(--line); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
-  .trow{ background:var(--surface); display:flex; align-items:center; gap:10px; padding:10px 12px; }
+  .trow{ background:var(--surface); display:flex; align-items:center; gap:10px; padding:10px 12px; animation:mo-fade-in var(--mo-fast) var(--mo-ease) both; }
   .trow .tdot{ width:8px; height:8px; border-radius:50%; flex:none; }
   .trow .ttime{ font-family:'IBM Plex Mono', monospace; font-size:.76rem; color:var(--ink-soft); width:42px; flex:none; }
   .trow .tmain{ flex:1; min-width:0; }
@@ -109,23 +120,32 @@
   .cat-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   .cat-grid .full{ grid-column:1 / -1; }
   button.cat{ border:1px solid var(--line); background:var(--surface); border-radius:14px; padding:16px 12px; text-align:left;
-    cursor:pointer; box-shadow:var(--shadow); font-family:'Nunito Sans',sans-serif; }
+    cursor:pointer; box-shadow:var(--shadow); font-family:'Nunito Sans',sans-serif; transition:transform var(--mo-fast) var(--mo-ease); }
   button.cat .cdot{ width:11px; height:11px; border-radius:50%; margin-bottom:10px; }
   button.cat .cname{ font-weight:800; font-size:.98rem; color:var(--ink); }
   button.cat .cnote{ font-size:.72rem; color:var(--ink-soft); margin-top:2px; }
-  button.cat:active{ transform:scale(.98); }
+  button.cat:active{ transform:scale(.96); }
 
   .sheet-backdrop{ position:fixed; inset:0; background:rgba(20,18,26,.42); display:none; align-items:flex-end; justify-content:center; z-index:40; }
-  .sheet-backdrop.show{ display:flex; }
+  .sheet-backdrop.show{ display:flex; animation:mo-fade-in var(--mo-fast) var(--mo-ease) both; }
   .sheet{ background:var(--paper); width:100%; max-width:480px; border-radius:20px 20px 0 0; padding:18px 18px calc(18px + env(safe-area-inset-bottom));
-    box-shadow:0 -10px 30px rgba(0,0,0,.25); max-height:86vh; overflow:auto; }
+    box-shadow:0 -10px 30px rgba(0,0,0,.25); max-height:86vh; overflow:auto; animation:mo-slide-up var(--mo-med) var(--mo-ease-out) both; }
+
+  .confirm-backdrop{ position:fixed; inset:0; background:rgba(20,18,26,.5); display:flex; align-items:center; justify-content:center;
+    z-index:70; padding:20px; animation:mo-fade-in var(--mo-fast) var(--mo-ease) both; }
+  .confirm-box{ background:var(--paper); border-radius:16px; padding:20px; max-width:340px; width:100%;
+    box-shadow:0 10px 40px rgba(0,0,0,.3); text-align:center; animation:mo-bounce-in var(--mo-med) var(--mo-bounce) both; }
+  .confirm-box p{ font-size:.94rem; margin:0 0 16px; color:var(--ink); font-weight:700; }
+  .confirm-box .rowbtns{ margin-top:0; }
+  .confirm-box button.save{ color:#fff; }
   .sheet h3{ font-family:'Fraunces',serif; font-size:1.15rem; margin:0 0 14px; display:flex; align-items:center; gap:8px; }
   .sheet .swatch{ width:12px; height:12px; border-radius:50%; }
   .field{ margin-bottom:14px; }
   .field label{ display:block; font-size:.74rem; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); font-weight:700; margin-bottom:7px; }
   .chips{ display:flex; flex-wrap:wrap; gap:7px; }
   .chip{ border:1px solid var(--line-strong); background:var(--surface); color:var(--ink); border-radius:999px; padding:8px 14px;
-    font-size:.84rem; font-weight:700; cursor:pointer; font-family:'Nunito Sans',sans-serif; }
+    font-size:.84rem; font-weight:700; cursor:pointer; font-family:'Nunito Sans',sans-serif; transition:transform var(--mo-fast) var(--mo-ease), background var(--mo-fast) var(--mo-ease), border-color var(--mo-fast) var(--mo-ease); }
+  .chip:active{ transform:scale(.95); }
   .chip.sel{ background:var(--accent); border-color:var(--accent); color:#fff; }
   input[type=number], input[type=text], input[type=time], input[type=date]{ width:100%; padding:11px 12px; border-radius:10px; border:1px solid var(--line-strong);
     background:var(--surface); color:var(--ink); font:inherit; font-family:'IBM Plex Mono',monospace; font-size:1rem; }
@@ -137,14 +157,17 @@
   button.medopt:active{ transform:scale(.98); }
   .presets{ display:flex; flex-wrap:wrap; gap:7px; margin-top:8px; }
   .preset{ border:1px solid var(--line-strong); background:var(--surface); border-radius:9px; padding:7px 11px; font-family:'IBM Plex Mono',monospace;
-    font-size:.82rem; font-weight:500; cursor:pointer; color:var(--ink); }
+    font-size:.82rem; font-weight:500; cursor:pointer; color:var(--ink); transition:transform var(--mo-fast) var(--mo-ease); }
+  .preset:active{ transform:scale(.93); }
   .preset.sel{ background:var(--milk-soft); border-color:var(--milk); color:var(--milk); }
   .rowbtns{ display:flex; gap:10px; margin-top:6px; }
   button.save{ flex:1; background:var(--accent); color:#fff; border:none; border-radius:12px; padding:14px; font-weight:800;
-    font-size:.96rem; cursor:pointer; font-family:'Nunito Sans',sans-serif; }
+    font-size:.96rem; cursor:pointer; font-family:'Nunito Sans',sans-serif; transition:transform var(--mo-fast) var(--mo-ease); }
   button.save:disabled{ opacity:.55; }
+  button.save:active:not(:disabled){ transform:scale(.97); }
   button.cancel{ background:transparent; border:1px solid var(--line-strong); color:var(--ink-soft); border-radius:12px; padding:14px 18px;
-    font-weight:700; cursor:pointer; font-family:'Nunito Sans',sans-serif; }
+    font-weight:700; cursor:pointer; font-family:'Nunito Sans',sans-serif; transition:transform var(--mo-fast) var(--mo-ease); }
+  button.cancel:active{ transform:scale(.97); }
   .saymsg{ font-size:.78rem; color:var(--danger); margin-top:8px; min-height:1em; }
 
   .hist-toggle{ display:flex; gap:8px; margin-bottom:12px; }
@@ -263,13 +286,17 @@
 
   // ---------- category config ----------
   var CATS = [
-    {key:'cg',   label:'C&G',        note:'Formula bottle',  color:'milk',  ml:true,  leftover:true, presets:[30,40,50,60,70,80,90,100]},
-    {key:'ebm',  label:'EBM',        note:'Expressed milk',  color:'milk',  ml:true,  leftover:true, presets:[30,40,50,60,70,80,90,100]},
-    {key:'mixed',label:'Mixed',      note:'C&G + EBM combined', color:'milk', ml:true, leftover:true, presets:[30,40,50,60,70,80,90,100]},
+    {key:'cg',   label:'C&G',        note:'Formula bottle',  color:'milk',  ml:true,  leftover:true, presets:[50,60,70,80,90,100,110,120]},
+    {key:'ebm',  label:'EBM',        note:'Expressed milk',  color:'milk',  ml:true,  leftover:true, presets:[50,60,70,80,90,100,110,120]},
+    {key:'mixed',label:'Mixed',      note:'C&G + EBM combined', color:'milk', ml:true, leftover:true, presets:[50,60,70,80,90,100,110,120]},
     {key:'breast',label:'Breast',    note:'Optional side & minutes', color:'accent', side:true, dur:true, durOptional:true},
     {key:'pump', label:'Pump',       note:'Express, ~25 min', color:'accent', dur:true, durDefault:25},
-    {key:'pp',   label:'Power pump', note:'~60 min',          color:'accent', dur:true, durDefault:60},
     {key:'nappy',label:'Nappy',      note:'Wet / soiled',     color:'wet',   nappy:true},
+    {key:'potty',label:'Potty',      note:'Wee / poo',        color:'wet',   nappy:true, nappyLabels:['Wee','Poo','Wee+Poo']},
+    // Hidden from the Log grid — replaced by the Potty tile above — but kept
+    // as its own CATS entry so historical Power pump sessions still render
+    // and export correctly, and can still be re-picked when editing an entry.
+    {key:'pp',   label:'Power pump', note:'~60 min',          color:'accent', dur:true, durDefault:60, hidden:true},
     {key:'sleep',label:'Sleep',      note:'Tap to start, tap again to end', color:'sleep', sleepTile:true},
     {key:'vomit',label:'Sick',       note:'Vomit / posset',   color:'soiled'},
     {key:'med',  label:'Medication',note:'Vitamin D, Gaviscon, Calpol & more', color:'good', picker:true},
@@ -308,7 +335,7 @@
       else bits.push('ongoing');
     } else {
       if (typeof ev.ml === 'number') bits.push(ev.ml + 'ml' + (typeof ev.leftover === 'number' && ev.leftover > 0 ? ' offered · ' + ev.leftover + 'ml left · ' + netMl(ev) + 'ml taken' : ''));
-      if (ev.ty === 'nappy' && ev.nap) bits.push(ev.nap);
+      if ((ev.ty === 'nappy' || ev.ty === 'potty') && ev.nap) bits.push(ev.nap);
       if (typeof ev.dur === 'number') bits.push(ev.dur + ' min');
       if (ev.side) bits.push(ev.side);
     }
@@ -399,6 +426,22 @@
     t._h = setTimeout(function(){ t.classList.remove('show'); }, 2200);
   }
 
+  // Custom confirmation dialog — used instead of window.confirm() so the
+  // prompt always renders reliably (some installed/standalone PWA contexts
+  // suppress native confirm()/alert() dialogs) and matches the app's look.
+  function confirmAction(message, onYes){
+    var wrap = document.createElement('div');
+    wrap.className = 'confirm-backdrop';
+    wrap.innerHTML = '<div class="confirm-box"><p>'+escText(message)+'</p>'+
+      '<div class="rowbtns"><button class="cancel" id="confirmNoBtn" type="button">Cancel</button>'+
+      '<button class="save" id="confirmYesBtn" type="button" style="background:var(--danger)">Delete</button></div></div>';
+    document.body.appendChild(wrap);
+    function close(){ wrap.remove(); }
+    wrap.addEventListener('click', function(e){ if (e.target === wrap) close(); });
+    wrap.querySelector('#confirmNoBtn').addEventListener('click', close);
+    wrap.querySelector('#confirmYesBtn').addEventListener('click', function(){ close(); onYes(); });
+  }
+
   // ---------- tabs ----------
   document.querySelectorAll('nav.tabs button').forEach(function(btn){
     btn.addEventListener('click', function(){
@@ -421,9 +464,9 @@
       if ((e.ty==='cg'||e.ty==='ebm'||e.ty==='mixed')) ml += netMl(e);
       if (e.ty==='breast') breastN++;
       if (e.ty==='pump'||e.ty==='pp') pumpN++;
-      if (e.ty==='nappy' && e.nap){
-        if (e.nap.indexOf('Wet')>-1) wetN++;
-        if (e.nap.indexOf('Soiled')>-1) soiledN++;
+      if ((e.ty==='nappy'||e.ty==='potty') && e.nap){
+        if (e.nap.indexOf('Wet')>-1 || e.nap.indexOf('Wee')>-1) wetN++;
+        if (e.nap.indexOf('Soiled')>-1 || e.nap.indexOf('Poo')>-1) soiledN++;
       }
       if (e.ty==='sleep' && typeof e.dur==='number' && e.end){ sleepMin+=e.dur; sleepN++; }
     });
@@ -592,7 +635,7 @@
     }
     if (c.nappy){
       html += '<div class="field"><label>Type</label><div class="chips" id="nappyChips">'+
-        ['Wet','Soiled','Wet+Soiled'].map(function(n){ return '<div class="chip'+(sheetState.nap===n?' sel':'')+'" data-n="'+n+'">'+n+'</div>'; }).join('')+
+        (c.nappyLabels||['Wet','Soiled','Wet+Soiled']).map(function(n){ return '<div class="chip'+(sheetState.nap===n?' sel':'')+'" data-n="'+n+'">'+n+'</div>'; }).join('')+
         '</div></div>';
     }
     if (c.side){
@@ -669,7 +712,11 @@
     if (!sheetState.time){ msg.textContent = 'Set a time.'; return; }
     if (c.ml && !sheetState.ml){ msg.textContent = 'Enter how many ml.'; return; }
     if (c.leftover && sheetState.leftover != null && (sheetState.leftover < 0 || sheetState.leftover > sheetState.ml)){ msg.textContent = 'Leftover can\'t be more than the amount offered.'; return; }
-    if (c.nappy && !sheetState.nap){ msg.textContent = 'Pick wet, soiled, or both.'; return; }
+    if (c.nappy && !sheetState.nap){
+      var nLabs = c.nappyLabels || ['Wet','Soiled','Wet+Soiled'];
+      msg.textContent = 'Pick ' + nLabs[0].toLowerCase() + ', ' + nLabs[1].toLowerCase() + ', or both.';
+      return;
+    }
     if (c.customName && !(sheetState.medName && sheetState.medName.trim())){ msg.textContent = 'Enter the medication name.'; return; }
 
     var ev = {
@@ -886,16 +933,17 @@
   }
 
   function deleteEvent(dateStr, id, after){
-    if (!confirm('Delete this entry?')) return;
-    if (!db){ toast('Not connected — try again in a moment.'); if (after) after('Not connected'); return; }
-    db.rpc('delete_event', {p_date: dateStr, p_event_id: id}).then(function(res){
-      var err = res.error ? 'Could not delete — try again.' : null;
-      if (!err && dateStr === currentCycle){
-        todayEvents = todayEvents.filter(function(e){ return e.id !== id; });
-        renderStats(); renderTimeline(); renderLastLine();
-      }
-      if (err) toast(err);
-      if (after) after(err);
+    confirmAction('Delete this entry?', function(){
+      if (!db){ toast('Not connected — try again in a moment.'); if (after) after('Not connected'); return; }
+      db.rpc('delete_event', {p_date: dateStr, p_event_id: id}).then(function(res){
+        var err = res.error ? 'Could not delete — try again.' : null;
+        if (!err && dateStr === currentCycle){
+          todayEvents = todayEvents.filter(function(e){ return e.id !== id; });
+          renderStats(); renderTimeline(); renderLastLine();
+        }
+        if (err) toast(err);
+        if (after) after(err);
+      });
     });
   }
 
@@ -1061,9 +1109,9 @@
       if ((e.ty==='cg'||e.ty==='ebm'||e.ty==='mixed')) t.ml+=netMl(e);
       if (e.ty==='breast') t.breast++;
       if (e.ty==='pump'||e.ty==='pp') t.pump++;
-      if (e.ty==='nappy' && e.nap){
-        if (e.nap.indexOf('Wet')>-1) t.wet++;
-        if (e.nap.indexOf('Soiled')>-1) t.soiled++;
+      if ((e.ty==='nappy'||e.ty==='potty') && e.nap){
+        if (e.nap.indexOf('Wet')>-1 || e.nap.indexOf('Wee')>-1) t.wet++;
+        if (e.nap.indexOf('Soiled')>-1 || e.nap.indexOf('Poo')>-1) t.soiled++;
       }
       if (e.ty==='sleep' && typeof e.dur==='number' && e.end){ t.sleepMin+=e.dur; t.sleepN++; }
     });
@@ -1320,8 +1368,9 @@
     });
     listWrap.querySelectorAll('.gm-del').forEach(function(b){
       b.addEventListener('click', function(){
-        if (!confirm('Delete this weight entry?')) return;
-        deleteGrowthMeasurement(b.dataset.id, function(err){ if (err) toast(err); });
+        confirmAction('Delete this weight entry?', function(){
+          deleteGrowthMeasurement(b.dataset.id, function(err){ if (err) toast(err); });
+        });
       });
     });
     var latest = measurements.slice().sort(function(a,b){ return a.date<b.date?1:-1; })[0];
@@ -1452,16 +1501,16 @@
       '',
       '1. Daily summary — one row per feed-cycle day (day runs 09:00 to 08:59, matching the ' +
         'app\'s "today" boundary), with bottle ml (net of any leftover), breast/pump session ' +
-        'counts and minutes, nappy counts, sleep totals, and all-event counts.',
+        'counts and minutes, nappy + potty counts, sleep totals, and all-event counts.',
       '2. Weekly summary — the same totals rolled up by ISO week.',
       '3. Event log — every single logged event, one row each: time, who logged it, type, ' +
-        'ml offered/left/taken, nappy type, duration, sleep end time, medication name (for a ' +
+        'ml offered/left/taken, nappy/potty type, duration, sleep end time, medication name (for a ' +
         'custom "Other" medication), and any note left on the entry.',
       '4. Who logged what — a tally of events per person.',
       '5. Leftover adjustments — every bottle feed where a leftover amount was recorded, ' +
         'showing what was offered, what was left, and what was actually taken.',
       '6. Sleep log — every nap: start, end, duration, who logged it.',
-      '7. Soiled by time of day — when soiled nappies tend to happen, by hour.',
+      '7. Soiled by time of day — when soiled nappies and potty poos tend to happen, by hour.',
       '8. Growth data — Lolu\'s logged weights plus the UK-WHO 9-centile weight-for-age ' +
         'reference grid (WHO Child Growth Standards, LMS method), with the same percentile ' +
         'formulas as the app\'s Growth tab. The live trend chart itself is on the Growth tab ' +
@@ -1490,7 +1539,7 @@
 
   // ---------- Sheet: Event log ----------
   var EVLOG_HEADERS = ['Date', 'Time', 'Logged by', 'Event type', 'Offered ml', 'Leftover ml',
-    'Taken ml (net)', 'Nappy', 'Side', 'Duration min', 'Sleep end', 'Sleep duration min',
+    'Taken ml (net)', 'Nappy / potty', 'Side', 'Duration min', 'Sleep end', 'Sleep duration min',
     'Medication (if "Other")', 'Note'];
 
   function buildEventLog(wb, days) {
@@ -1517,7 +1566,7 @@
           if (typeof e.leftover === 'number') ws.getCell(r, 6).value = e.leftover;
           ws.getCell(r, 7).value = { formula: 'IF(E' + r + '="","",E' + r + '-N(F' + r + '))' };
         }
-        if (ty === 'nappy' && e.nap) ws.getCell(r, 8).value = e.nap;
+        if ((ty === 'nappy' || ty === 'potty') && e.nap) ws.getCell(r, 8).value = e.nap;
         if (e.side) ws.getCell(r, 9).value = e.side;
         if ((ty === 'breast' || ty === 'pump' || ty === 'pp') && typeof e.dur === 'number') ws.getCell(r, 10).value = e.dur;
         if (ty === 'sleep') {
@@ -1541,7 +1590,7 @@
   // ---------- Sheet: Daily summary ----------
   var DAILY_HEADERS = ['Date (cycle day starts 09:00)', 'ISO week', 'C&G ml', 'EBM ml', 'Mixed ml',
     'Bottle total ml (net)', 'Breast sessions', 'Breast minutes', 'Pump sessions', 'Pump minutes',
-    'Power pump sessions', 'Power pump minutes', 'Wet nappies', 'Soiled nappies', 'Vomit / posset',
+    'Power pump sessions', 'Power pump minutes', 'Wet nappies + wees', 'Soiled nappies + poos', 'Vomit / posset',
     'Vitamin D logs', 'Gaviscon feeds', 'Bottles with leftover noted', 'Sleep minutes', 'Naps logged', 'All events'];
 
   function buildDailySummary(wb, days, evlogLastRow) {
@@ -1577,8 +1626,8 @@
       ws.getCell(r, 10).value = { formula: sumifs(J, 'Pump') };
       ws.getCell(r, 11).value = { formula: countifs('Power pump') };
       ws.getCell(r, 12).value = { formula: sumifs(J, 'Power pump') };
-      ws.getCell(r, 13).value = { formula: 'COUNTIFS(' + A + ',$A' + r + ',' + H + ',"Wet")+COUNTIFS(' + A + ',$A' + r + ',' + H + ',"Wet+Soiled")' };
-      ws.getCell(r, 14).value = { formula: 'COUNTIFS(' + A + ',$A' + r + ',' + H + ',"Soiled")+COUNTIFS(' + A + ',$A' + r + ',' + H + ',"Wet+Soiled")' };
+      ws.getCell(r, 13).value = { formula: 'COUNTIFS(' + A + ',$A' + r + ',' + H + ',"Wet")+COUNTIFS(' + A + ',$A' + r + ',' + H + ',"Wet+Soiled")+COUNTIFS(' + A + ',$A' + r + ',' + H + ',"Wee")+COUNTIFS(' + A + ',$A' + r + ',' + H + ',"Wee+Poo")' };
+      ws.getCell(r, 14).value = { formula: 'COUNTIFS(' + A + ',$A' + r + ',' + H + ',"Soiled")+COUNTIFS(' + A + ',$A' + r + ',' + H + ',"Wet+Soiled")+COUNTIFS(' + A + ',$A' + r + ',' + H + ',"Poo")+COUNTIFS(' + A + ',$A' + r + ',' + H + ',"Wee+Poo")' };
       ws.getCell(r, 15).value = { formula: countifs('Sick') };
       ws.getCell(r, 16).value = { formula: countifs('Vitamin D') };
       ws.getCell(r, 17).value = { formula: countifs('Gaviscon') };
@@ -1599,8 +1648,8 @@
 
   // ---------- Sheet: Weekly summary ----------
   var WEEKLY_HEADERS = ['ISO week', 'From', 'To', 'Days logged', 'C&G ml', 'EBM ml', 'Mixed ml',
-    'Bottle ml (net)', 'Breast sessions', 'Pump sessions', 'Power pump sessions', 'Wet nappies',
-    'Soiled nappies', 'Vomit', 'Sleep minutes', 'Naps logged', 'Avg bottle ml / logged day'];
+    'Bottle ml (net)', 'Breast sessions', 'Pump sessions', 'Power pump sessions', 'Wet nappies + wees',
+    'Soiled nappies + poos', 'Vomit', 'Sleep minutes', 'Naps logged', 'Avg bottle ml / logged day'];
 
   function buildWeeklySummary(wb, days, dailyLastRow) {
     var ws = wb.addWorksheet('Weekly summary');
@@ -1781,26 +1830,27 @@
   function buildSoiledByHour(wb, days) {
     var ws = wb.addWorksheet('Soiled by time of day', { views: [{ showGridLines: false }] });
     ws.mergeCells('A1:C1');
-    ws.getCell('A1').value = 'Soiled nappies — by hour logged';
+    ws.getCell('A1').value = 'Soiled nappies & poos — by hour logged';
     ws.getCell('A1').font = SECTION_FONT;
     ws.mergeCells('A2:C2');
-    ws.getCell('A2').value = 'Times are when the soiled nappy was logged, bucketed by the hour. Useful for ' +
+    ws.getCell('A2').value = 'Times are when the soiled nappy or potty poo was logged, bucketed by the hour. Useful for ' +
       'spotting a pattern (e.g. usually after the first morning feed).';
     ws.getCell('A2').font = BODY_FONT;
     ws.getCell('A2').alignment = LEFT_WRAP;
     ws.getRow(2).height = 30;
 
+    var SOILED_NAP = {Soiled:1, 'Wet+Soiled':1, Poo:1, 'Wee+Poo':1};
     var counts = new Array(24).fill(0);
     days.forEach(function (day) {
       (day.events || []).forEach(function (e) {
-        if (e.ty === 'nappy' && (e.nap === 'Soiled' || e.nap === 'Wet+Soiled') && e.t) {
+        if ((e.ty === 'nappy' || e.ty === 'potty') && e.nap && SOILED_NAP[e.nap] && e.t) {
           var hour = parseInt(e.t.split(':')[0], 10);
           if (!isNaN(hour) && hour >= 0 && hour < 24) counts[hour]++;
         }
       });
     });
 
-    var headers = ['Hour', 'Soiled nappies logged'];
+    var headers = ['Hour', 'Soiled nappies + poos logged'];
     var HEADER_ROW = 4;
     headers.forEach(function (h, i) {
       var c = ws.getCell(HEADER_ROW, 1 + i);
