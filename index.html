@@ -68,6 +68,18 @@
 
   .sleepband{ margin-top:8px; padding:10px 12px; background:var(--sleep-soft); border:1px solid var(--sleep); border-radius:12px;
     display:flex; align-items:center; gap:10px; }
+  /* Pre-existing rendering quirk, unrelated to the motion work but found
+     while touching this element: [hidden]'s UA display:none loses to this
+     class's own display:flex on specificity ties in some engines, leaving
+     an empty coloured bar whenever there's no active nap. Higher-specificity
+     fix, no JS change needed. */
+  .sleepband[hidden]{ display:none; }
+  /* Live-state dot: a small square footage so the ping halo has room to grow
+     into without nudging surrounding layout — only the dot pulses, the
+     banner itself stays calm/static. */
+  .sleepband .live-dot-wrap{ position:relative; width:9px; height:9px; flex:none; }
+  .sleepband .live-dot{ position:absolute; inset:0; width:9px; height:9px; border-radius:50%; background:var(--sleep); }
+  .sleepband .live-ping{ position:absolute; inset:0; width:9px; height:9px; border-radius:50%; background:var(--sleep); opacity:.6; }
   .sleepband .txt{ font-size:.86rem; color:var(--ink); flex:1; }
   .sleepband .txt b{ font-weight:800; }
   .sleepband button{ flex:none; border:none; background:var(--sleep); color:#fff; font-weight:800; font-size:.78rem;
@@ -85,15 +97,56 @@
   @media (prefers-reduced-motion: reduce){ section.view.active{ animation:none; } }
   @keyframes fade{ from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;} }
 
-  /* ── Motion — a small hand-picked subset of EaseMotion CSS
-     (MIT licensed: https://github.com/Johhnmarshal/EaseMotion-css),
-     just the timing tokens + keyframes this app actually uses. ── */
-  :root{ --mo-fast:150ms; --mo-med:280ms; --mo-ease:cubic-bezier(.4,0,.2,1); --mo-ease-out:cubic-bezier(0,0,.2,1); --mo-bounce:cubic-bezier(.34,1.56,.64,1); }
-  @keyframes mo-fade-in{ from{opacity:0} to{opacity:1} }
-  @keyframes mo-slide-up{ from{opacity:0; transform:translate3d(0,28px,0)} to{opacity:1; transform:translate3d(0,0,0)} }
-  @keyframes mo-bounce-in{ 0%{transform:scale(.85); opacity:0} 60%{transform:scale(1.03); opacity:1} 100%{transform:scale(1); opacity:1} }
+  /* ── Motion — a small hand-picked subset of EaseMotion CSS utilities
+     (MIT licensed: https://github.com/Johhnmarshal/EaseMotion-css).
+     Only the timing tokens + keyframes/classes this app actually uses are
+     pulled in verbatim (matched against core/animations.css + variables.css
+     in the source repo) — not the framework's base reset, typography,
+     colour system, or components, so Lolu's Log's own design system and
+     fonts stay untouched. Classes intentionally left out: anything from
+     the "decorative" end of the catalogue (ease-shake, ease-hover-morph-card,
+     ease-gradient-rotation, ease-shimmer-text, ease-flip, ease-float, …) —
+     motion here should mark state/appearance/success, not add flourish. ── */
+  :root{
+    --ease-speed-fast:150ms; --ease-speed-medium:300ms; --ease-speed-slow:600ms;
+    --ease-ease:cubic-bezier(.4,0,.2,1); --ease-ease-out:cubic-bezier(0,0,.2,1); --ease-ease-bounce:cubic-bezier(.34,1.56,.64,1);
+    --ease-animation-iterations:infinite;
+    /* EaseMotion's skeleton-shimmer reads these two neutrals — mapped onto
+       Lolu's Log's own line tokens (which already flip for dark mode) rather
+       than importing EaseMotion's own colour palette. */
+    --ease-color-neutral-100:var(--line); --ease-color-neutral-200:var(--line-strong);
+  }
+  @keyframes ease-kf-fade-in{ from{opacity:0} to{opacity:1} }
+  @keyframes ease-kf-slide-up{ from{opacity:0; transform:translate3d(0,24px,0)} to{opacity:1; transform:translate3d(0,0,0)} }
+  @keyframes ease-kf-slide-in-from-bottom{ from{opacity:0; transform:translate3d(0,100%,0)} to{opacity:1; transform:translate3d(0,0,0)} }
+  @keyframes ease-kf-bounce-in{ 0%{transform:scale(0); opacity:0} 50%{transform:scale(1.15); opacity:1} 70%{transform:scale(.92)} 85%{transform:scale(1.05)} 100%{transform:scale(1); opacity:1} }
+  @keyframes ease-kf-pulse{ 0%,100%{opacity:1} 50%{opacity:.45} }
+  @keyframes ease-kf-ping{ 75%,100%{transform:scale(2); opacity:0} }
+  @keyframes ease-kf-shimmer{ 0%{translate:-100% 0} 100%{translate:100% 0} }
+
+  .ease-fade-in{ animation:ease-kf-fade-in var(--ease-speed-medium) var(--ease-ease) both; }
+  .ease-slide-up{ animation:ease-kf-slide-up var(--ease-speed-medium) var(--ease-ease) both; }
+  .ease-slide-in-from-bottom{ animation:ease-kf-slide-in-from-bottom var(--ease-speed-medium) var(--ease-ease) both; }
+  .ease-bounce-in{ animation:ease-kf-bounce-in var(--ease-speed-medium) var(--ease-ease-bounce) both; }
+  .ease-pulse{ animation:ease-kf-pulse 2s var(--ease-ease) var(--ease-animation-iterations); }
+  .ease-ping{ animation:ease-kf-ping 1s var(--ease-ease-out) var(--ease-animation-iterations); }
+  .ease-delay-75{ animation-delay:75ms; } .ease-delay-100{ animation-delay:100ms; } .ease-delay-150{ animation-delay:150ms; }
+  .ease-delay-200{ animation-delay:200ms; } .ease-delay-300{ animation-delay:300ms; }
+
+  .ease-skeleton-shimmer{ position:relative; overflow:hidden; background:var(--ease-color-neutral-100); }
+  .ease-skeleton-shimmer::before{ content:""; position:absolute; inset:0;
+    background:linear-gradient(90deg, transparent 0px, var(--ease-color-neutral-200) 40px, transparent 80px);
+    translate:-100% 0; animation:ease-kf-shimmer 2s infinite linear forwards; }
+
+  /* Hover-only lift, scoped to pointer devices so touch never gets a sticky
+     "hover" state — touch keeps the existing :active tap feedback instead. */
+  @media (hover:hover) and (pointer:fine){
+    .ease-hover-lift-shadow{ transition:transform var(--ease-speed-medium) var(--ease-ease), box-shadow var(--ease-speed-medium) var(--ease-ease); }
+    .ease-hover-lift-shadow:hover{ transform:translateY(-4px); box-shadow:0 12px 32px rgba(0,0,0,.15), 0 4px 12px rgba(0,0,0,.1); }
+  }
+
   @media (prefers-reduced-motion: reduce){
-    .sheet-backdrop.show, .sheet-backdrop.show .sheet, .confirm-box, .trow{ animation:none !important; }
+    *, *::before, *::after{ animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; scroll-behavior:auto !important; }
   }
 
   .stat-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
@@ -105,7 +158,7 @@
 
   h2.sec{ font-family:'Fraunces', serif; font-size:1rem; font-weight:600; margin:20px 0 8px; }
   .timeline{ display:flex; flex-direction:column; gap:1px; background:var(--line); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
-  .trow{ background:var(--surface); display:flex; align-items:center; gap:10px; padding:10px 12px; animation:mo-fade-in var(--mo-fast) var(--mo-ease) both; }
+  .trow{ background:var(--surface); display:flex; align-items:center; gap:10px; padding:10px 12px; }
   .trow .tdot{ width:8px; height:8px; border-radius:50%; flex:none; }
   .trow .ttime{ font-family:'IBM Plex Mono', monospace; font-size:.76rem; color:var(--ink-soft); width:42px; flex:none; }
   .trow .tmain{ flex:1; min-width:0; }
@@ -120,21 +173,26 @@
   .cat-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   .cat-grid .full{ grid-column:1 / -1; }
   button.cat{ border:1px solid var(--line); background:var(--surface); border-radius:14px; padding:16px 12px; text-align:left;
-    cursor:pointer; box-shadow:var(--shadow); font-family:'Nunito Sans',sans-serif; transition:transform var(--mo-fast) var(--mo-ease); }
+    cursor:pointer; box-shadow:var(--shadow); font-family:'Nunito Sans',sans-serif; transition:transform var(--ease-speed-fast) var(--ease-ease); }
   button.cat .cdot{ width:11px; height:11px; border-radius:50%; margin-bottom:10px; }
   button.cat .cname{ font-weight:800; font-size:.98rem; color:var(--ink); }
   button.cat .cnote{ font-size:.72rem; color:var(--ink-soft); margin-top:2px; }
   button.cat:active{ transform:scale(.96); }
 
   .sheet-backdrop{ position:fixed; inset:0; background:rgba(20,18,26,.42); display:none; align-items:flex-end; justify-content:center; z-index:40; }
-  .sheet-backdrop.show{ display:flex; animation:mo-fade-in var(--mo-fast) var(--mo-ease) both; }
+  .sheet-backdrop.show{ display:flex; animation:ease-kf-fade-in var(--ease-speed-fast) var(--ease-ease) both; }
+  /* .sheet is a singleton node whose innerHTML is swapped, not re-created —
+     but its ancestor backdrop toggles display:none↔flex, which unmounts it
+     visually each time the sheet is closed, so this entrance animation only
+     ever plays on a genuine open, exactly once, never on the re-renders
+     openSheet()/renderSheet() do while it's already showing. */
   .sheet{ background:var(--paper); width:100%; max-width:480px; border-radius:20px 20px 0 0; padding:18px 18px calc(18px + env(safe-area-inset-bottom));
-    box-shadow:0 -10px 30px rgba(0,0,0,.25); max-height:86vh; overflow:auto; animation:mo-slide-up var(--mo-med) var(--mo-ease-out) both; }
+    box-shadow:0 -10px 30px rgba(0,0,0,.25); max-height:86vh; overflow:auto; animation:ease-kf-slide-in-from-bottom var(--ease-speed-medium) var(--ease-ease) both; }
 
   .confirm-backdrop{ position:fixed; inset:0; background:rgba(20,18,26,.5); display:flex; align-items:center; justify-content:center;
-    z-index:70; padding:20px; animation:mo-fade-in var(--mo-fast) var(--mo-ease) both; }
+    z-index:70; padding:20px; animation:ease-kf-fade-in var(--ease-speed-fast) var(--ease-ease) both; }
   .confirm-box{ background:var(--paper); border-radius:16px; padding:20px; max-width:340px; width:100%;
-    box-shadow:0 10px 40px rgba(0,0,0,.3); text-align:center; animation:mo-bounce-in var(--mo-med) var(--mo-bounce) both; }
+    box-shadow:0 10px 40px rgba(0,0,0,.3); text-align:center; animation:ease-kf-bounce-in var(--ease-speed-medium) var(--ease-ease-bounce) both; }
   .confirm-box p{ font-size:.94rem; margin:0 0 16px; color:var(--ink); font-weight:700; }
   .confirm-box .rowbtns{ margin-top:0; }
   .confirm-box button.save{ color:#fff; }
@@ -144,7 +202,7 @@
   .field label{ display:block; font-size:.74rem; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); font-weight:700; margin-bottom:7px; }
   .chips{ display:flex; flex-wrap:wrap; gap:7px; }
   .chip{ border:1px solid var(--line-strong); background:var(--surface); color:var(--ink); border-radius:999px; padding:8px 14px;
-    font-size:.84rem; font-weight:700; cursor:pointer; font-family:'Nunito Sans',sans-serif; transition:transform var(--mo-fast) var(--mo-ease), background var(--mo-fast) var(--mo-ease), border-color var(--mo-fast) var(--mo-ease); }
+    font-size:.84rem; font-weight:700; cursor:pointer; font-family:'Nunito Sans',sans-serif; transition:transform var(--ease-speed-fast) var(--ease-ease), background var(--ease-speed-fast) var(--ease-ease), border-color var(--ease-speed-fast) var(--ease-ease); }
   .chip:active{ transform:scale(.95); }
   .chip.sel{ background:var(--accent); border-color:var(--accent); color:#fff; }
   input[type=number], input[type=text], input[type=time], input[type=date]{ width:100%; padding:11px 12px; border-radius:10px; border:1px solid var(--line-strong);
@@ -157,16 +215,16 @@
   button.medopt:active{ transform:scale(.98); }
   .presets{ display:flex; flex-wrap:wrap; gap:7px; margin-top:8px; }
   .preset{ border:1px solid var(--line-strong); background:var(--surface); border-radius:9px; padding:7px 11px; font-family:'IBM Plex Mono',monospace;
-    font-size:.82rem; font-weight:500; cursor:pointer; color:var(--ink); transition:transform var(--mo-fast) var(--mo-ease); }
+    font-size:.82rem; font-weight:500; cursor:pointer; color:var(--ink); transition:transform var(--ease-speed-fast) var(--ease-ease); }
   .preset:active{ transform:scale(.93); }
   .preset.sel{ background:var(--milk-soft); border-color:var(--milk); color:var(--milk); }
   .rowbtns{ display:flex; gap:10px; margin-top:6px; }
   button.save{ flex:1; background:var(--accent); color:#fff; border:none; border-radius:12px; padding:14px; font-weight:800;
-    font-size:.96rem; cursor:pointer; font-family:'Nunito Sans',sans-serif; transition:transform var(--mo-fast) var(--mo-ease); }
+    font-size:.96rem; cursor:pointer; font-family:'Nunito Sans',sans-serif; transition:transform var(--ease-speed-fast) var(--ease-ease); }
   button.save:disabled{ opacity:.55; }
   button.save:active:not(:disabled){ transform:scale(.97); }
   button.cancel{ background:transparent; border:1px solid var(--line-strong); color:var(--ink-soft); border-radius:12px; padding:14px 18px;
-    font-weight:700; cursor:pointer; font-family:'Nunito Sans',sans-serif; transition:transform var(--mo-fast) var(--mo-ease); }
+    font-weight:700; cursor:pointer; font-family:'Nunito Sans',sans-serif; transition:transform var(--ease-speed-fast) var(--ease-ease); }
   button.cancel:active{ transform:scale(.97); }
   .saymsg{ font-size:.78rem; color:var(--danger); margin-top:8px; min-height:1em; }
 
@@ -193,8 +251,11 @@
   .gm-row .rowbtns button{ font-size:.78rem; padding:8px 14px; }
 
   .toast{ position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px); background:var(--ink); color:var(--paper);
-    padding:10px 18px; border-radius:999px; font-size:.84rem; font-weight:700; opacity:0; pointer-events:none; transition:.25s; z-index:60; }
+    padding:10px 18px; border-radius:999px; font-size:.84rem; font-weight:700; opacity:0; pointer-events:none; transition:.25s; z-index:60;
+    display:flex; align-items:center; gap:6px; }
   .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+  .toast .toast-check{ display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:50%;
+    background:var(--good); color:var(--paper); font-size:.66rem; font-weight:800; flex:none; }
 
   footer.credit{ text-align:center; padding:16px 10px 4px; font-size:.68rem; color:var(--ink-soft); }
 </style>
@@ -238,17 +299,21 @@
         <button data-mode="weeks">Weeks</button>
         <button id="exportBtn" class="exportbtn" type="button">⇩ Export</button>
       </div>
-      <div id="historyList"><div class="empty">Loading history…</div></div>
+      <div id="historyList">
+        <div class="ease-skeleton-shimmer" style="height:76px;border-radius:14px;margin-bottom:9px"></div>
+        <div class="ease-skeleton-shimmer" style="height:76px;border-radius:14px;margin-bottom:9px"></div>
+        <div class="ease-skeleton-shimmer" style="height:76px;border-radius:14px;margin-bottom:9px"></div>
+      </div>
     </section>
 
     <section class="view" id="view-growth">
       <div class="stat-grid" style="grid-template-columns:1fr">
         <div class="stat acc" style="grid-column:1/-1">
           <div class="label">Growth</div>
-          <div class="sub" id="growthSummary" style="margin-top:4px;font-size:.86rem;color:var(--ink)">Loading…</div>
+          <div class="sub" id="growthSummary" style="margin-top:4px;font-size:.86rem;color:var(--ink)"><span class="ease-skeleton-shimmer" style="display:inline-block;height:13px;width:65%;border-radius:6px;vertical-align:middle"></span></div>
         </div>
       </div>
-      <div class="growth-chart-wrap" id="growthChartWrap"><div class="empty">Loading…</div></div>
+      <div class="growth-chart-wrap" id="growthChartWrap"><div class="ease-skeleton-shimmer" style="height:260px;border-radius:10px"></div></div>
       <div class="glegend">
         <span><i style="background:var(--growth-actual)"></i>Lolu</span>
         <span><i style="background:var(--ink-soft)"></i>50th (median)</span>
@@ -418,9 +483,13 @@
     el.querySelector('.txt').innerHTML = text;
   }
 
-  function toast(msg){
+  // opts.success shows a small check indicator that bounces in — used only
+  // for genuine "this just saved" moments (see call sites below), never for
+  // errors/info, and it's just the icon that animates, not the toast itself.
+  function toast(msg, opts){
     var t = document.getElementById('toast');
-    t.textContent = msg;
+    var success = opts && opts.success;
+    t.innerHTML = (success ? '<span class="toast-check ease-bounce-in">✓</span>' : '') + '<span>'+escText(msg)+'</span>';
     t.classList.add('show');
     clearTimeout(t._h);
     t._h = setTimeout(function(){ t.classList.remove('show'); }, 2200);
@@ -482,24 +551,51 @@
     renderSleepBanner();
   }
 
+  // Tracks whether the banner was visible as of the last render, so its
+  // slide-in entrance only plays on a genuine hidden→visible transition —
+  // renderStats() (and so renderSleepBanner()) runs on every data refresh,
+  // including realtime echoes of a save that has nothing to do with sleep,
+  // and it must not replay the entrance each time.
+  var sleepBannerWasVisible = false;
   function renderSleepBanner(){
     var ref = currentOpenSleep();
     var el = document.getElementById('sleepBanner');
-    if (!ref){ el.hidden = true; el.innerHTML=''; return; }
+    if (!ref){ el.hidden = true; el.innerHTML=''; sleepBannerWasVisible = false; return; }
     var open = ref.ev;
     var sinceLabel = (ref.dateStr !== currentCycle) ? (open.t+' ('+fmtDateLabel(ref.dateStr)+')') : open.t;
+    var justAppeared = !sleepBannerWasVisible;
     el.hidden = false;
-    el.innerHTML = '<div class="txt">😴 Asleep since <b>'+sinceLabel+'</b> ('+(open.by||'someone')+')</div><button id="endSleepBtn">End nap</button>';
+    el.className = 'sleepband' + (justAppeared ? ' ease-slide-in-from-bottom' : '');
+    el.innerHTML = '<span class="live-dot-wrap"><span class="live-dot ease-pulse"></span><span class="live-ping ease-ping" aria-hidden="true"></span></span>'+
+      '<div class="txt">😴 Asleep since <b>'+sinceLabel+'</b> ('+(open.by||'someone')+')</div><button id="endSleepBtn">End nap</button>';
     document.getElementById('endSleepBtn').addEventListener('click', function(){ openSleepSheet(ref.dateStr, ref.ev); });
+    sleepBannerWasVisible = true;
   }
 
+  // Shared stagger delays for "newly appeared" list rows (timeline, growth) —
+  // cycles rather than growing unboundedly for long lists.
+  var STAGGER_DELAYS = ['ease-delay-75','ease-delay-100','ease-delay-150','ease-delay-200','ease-delay-300'];
+
+  // Tracks which event ids were on screen last render, so renderTimeline()
+  // only plays the entrance animation on rows that are genuinely new — this
+  // function reruns on every data refresh (a save's optimistic update, a
+  // delete, an edit, and every realtime echo of any of those), and must not
+  // replay the whole list's entrance each time.
+  var prevTimelineIds = null;
   function renderTimeline(){
     var el = document.getElementById('todayTimeline');
-    if (!todayEvents.length){ el.outerHTML = '<div class="timeline" id="todayTimeline"><div class="empty" style="grid-column:1/-1">Nothing logged yet today — tap Log to start.</div></div>'; return; }
+    if (!todayEvents.length){ el.outerHTML = '<div class="timeline" id="todayTimeline"><div class="empty" style="grid-column:1/-1">Nothing logged yet today — tap Log to start.</div></div>'; prevTimelineIds = {}; return; }
     var sorted = todayEvents.slice().sort(function(a,b){ return cycleTimeKey(b.t) - cycleTimeKey(a.t); });
+    var prevIds = prevTimelineIds || {};
+    var nextIds = {};
+    var staggerN = 0;
     el.innerHTML = sorted.map(function(e){
       var d = describeEvent(e);
-      return '<div class="trow">'+
+      var isNew = !prevIds[e.id];
+      nextIds[e.id] = true;
+      var animClass = '';
+      if (isNew){ animClass = ' ease-slide-up '+STAGGER_DELAYS[staggerN % STAGGER_DELAYS.length]; staggerN++; }
+      return '<div class="trow'+animClass+'">'+
         '<div class="tdot" style="background:var(--'+d.color+')"></div>'+
         '<div class="ttime">'+e.t+'</div>'+
         '<div class="tmain"><div class="tt">'+d.title+'</div><div class="tb">'+(e.by||'')+'</div></div>'+
@@ -507,6 +603,7 @@
         '<button class="tdel" data-id="'+e.id+'" title="Delete">✕</button>'+
         '</div>';
     }).join('');
+    prevTimelineIds = nextIds;
     el.querySelectorAll('.tedit').forEach(function(b){
       b.addEventListener('click', function(){
         var ev = todayEvents.filter(function(x){ return x.id === b.dataset.id; })[0];
@@ -529,7 +626,7 @@
   function renderCatGrid(){
     var grid = document.getElementById('catGrid');
     grid.innerHTML = CATS.filter(function(c){ return !c.hidden; }).map(function(c){
-      return '<button class="cat" data-key="'+c.key+'"><div class="cdot" style="background:var(--'+c.color+')"></div>'+
+      return '<button class="cat ease-hover-lift-shadow" data-key="'+c.key+'"><div class="cdot" style="background:var(--'+c.color+')"></div>'+
         '<div class="cname">'+c.label+'</div><div class="cnote">'+c.note+'</div></button>';
     }).join('');
     grid.querySelectorAll('.cat').forEach(function(b){
@@ -747,7 +844,7 @@
       var finish = function(err){
         if (err){ msg.style.color='var(--danger)'; msg.textContent = err; document.getElementById('sheetSave').disabled=false; return; }
         closeSheet();
-        toast(targetDate === editDate ? 'Entry updated' : 'Entry moved to '+fmtDateLabel(targetDate));
+        toast(targetDate === editDate ? 'Entry updated' : 'Entry moved to '+fmtDateLabel(targetDate), {success:true});
         if (editDate !== currentCycle) refreshHistoryDay(editDate);
         if (targetDate !== editDate && targetDate !== currentCycle) refreshHistoryDay(targetDate);
       };
@@ -760,7 +857,7 @@
       saveEvent(targetDate, ev, function(err){
         if (err){ msg.style.color='var(--danger)'; msg.textContent = err; document.getElementById('sheetSave').disabled=false; return; }
         closeSheet();
-        toast('Logged: '+c.label+(ev.ml?' '+(ev.leftover?netMl(ev)+'ml taken':ev.ml+'ml'):'')+(targetDate!==currentCycle?' · '+fmtDateLabel(targetDate):''));
+        toast('Logged: '+c.label+(ev.ml?' '+(ev.leftover?netMl(ev)+'ml taken':ev.ml+'ml'):'')+(targetDate!==currentCycle?' · '+fmtDateLabel(targetDate):''), {success:true});
         document.querySelector('nav.tabs button[data-tab="today"]').click();
         if (targetDate !== currentCycle) refreshHistoryDay(targetDate);
       });
@@ -878,7 +975,7 @@
       saveEvent(targetDate, ev, function(err){
         if (err){ msg.style.color='var(--danger)'; msg.textContent = err; document.getElementById('sheetSave').disabled=false; return; }
         closeSheet();
-        toast('Nap started'+(targetDate!==currentCycle?' · '+fmtDateLabel(targetDate):''));
+        toast('Nap started'+(targetDate!==currentCycle?' · '+fmtDateLabel(targetDate):''), {success:true});
         document.querySelector('nav.tabs button[data-tab="today"]').click();
         if (targetDate !== currentCycle) refreshHistoryDay(targetDate);
         checkCarriedOpenSleep();
@@ -892,7 +989,7 @@
       var finish = function(err){
         if (err){ msg.style.color='var(--danger)'; msg.textContent = err; document.getElementById('sheetSave').disabled=false; return; }
         closeSheet();
-        toast(mode==='end' ? 'Nap ended · '+durLabel(dur) : (targetDate===originalDate ? 'Nap updated' : 'Nap moved to '+fmtDateLabel(targetDate)));
+        toast(mode==='end' ? 'Nap ended · '+durLabel(dur) : (targetDate===originalDate ? 'Nap updated' : 'Nap moved to '+fmtDateLabel(targetDate)), {success:true});
         if (originalDate !== currentCycle) refreshHistoryDay(originalDate);
         if (targetDate !== originalDate && targetDate !== currentCycle) refreshHistoryDay(targetDate);
         checkCarriedOpenSleep();
@@ -1333,13 +1430,25 @@
     return svg;
   }
 
+  // Same "only animate what's actually new" tracking as the timeline —
+  // renderGrowth() re-renders this whole list on every add/edit/delete/
+  // realtime echo, so only rows genuinely new since last render stagger in;
+  // in practice that means the full list once on first load, then silence.
+  var prevGrowthIds = null;
   function renderGrowthList(measurements){
     var sorted = measurements.slice().sort(function(a,b){ return a.date<b.date?1:-1; });
-    if (!sorted.length) return '<div class="empty">No weights logged yet — tap "Log a weight" to add the first one.</div>';
-    return sorted.map(function(m){
+    if (!sorted.length){ prevGrowthIds = {}; return '<div class="empty">No weights logged yet — tap "Log a weight" to add the first one.</div>'; }
+    var prevIds = prevGrowthIds || {};
+    var nextIds = {};
+    var staggerN = 0;
+    var html = sorted.map(function(m){
       var a = ageWeeksFor(m.date);
       var r = percentileFor(m.kg, a);
-      return '<div class="day-card gm-row" style="cursor:default">'+
+      var isNew = !prevIds[m.id];
+      nextIds[m.id] = true;
+      var animClass = '';
+      if (isNew){ animClass = ' ease-slide-up '+STAGGER_DELAYS[staggerN % STAGGER_DELAYS.length]; staggerN++; }
+      return '<div class="day-card gm-row'+animClass+'" style="cursor:default">'+
         '<div class="dhead"><div class="ddate">'+fmtDateLabel(m.date)+'</div><div class="dwol">'+ageLabel(a)+' old</div></div>'+
         '<div class="dstats"><span><b>'+fmtKg(m.kg)+' kg</b></span>'+
         '<span><b>'+r.pct.toFixed(1)+'th</b> percentile</span><span>'+bandLabel(r.pct)+'</span></div>'+
@@ -1348,6 +1457,8 @@
         '<button class="cancel gm-del" data-id="'+m.id+'" style="color:var(--danger);border-color:var(--danger)">Delete</button></div>'+
         '</div>';
     }).join('');
+    prevGrowthIds = nextIds;
+    return html;
   }
 
   function findMeasurement(id){
@@ -1359,7 +1470,7 @@
     var listWrap = document.getElementById('growthList');
     var summary = document.getElementById('growthSummary');
     if (!chartWrap) return;
-    if (!growthData){ chartWrap.innerHTML = '<div class="empty">Loading…</div>'; return; }
+    if (!growthData){ chartWrap.innerHTML = '<div class="ease-skeleton-shimmer" style="height:260px;border-radius:10px"></div>'; return; }
     var measurements = growthData.measurements || [];
     chartWrap.innerHTML = renderGrowthChart(measurements);
     listWrap.innerHTML = renderGrowthList(measurements);
@@ -1438,7 +1549,7 @@
     saveGrowthMeasurement(m, function(err){
       if (err){ msg.style.color='var(--danger)'; msg.textContent = err; document.getElementById('sheetSave').disabled=false; return; }
       closeSheet();
-      toast(wasEdit ? 'Weight updated' : 'Weight logged');
+      toast(wasEdit ? 'Weight updated' : 'Weight logged', {success:true});
     });
   }
 
