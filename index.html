@@ -155,6 +155,15 @@
   .stat .value{ font-family:'Fraunces', serif; font-size:1.9rem; font-weight:600; margin-top:4px; font-variant-numeric:tabular-nums; }
   .stat .sub{ font-size:.74rem; color:var(--ink-soft); margin-top:2px; }
   .stat.milk .value{ color:var(--milk); } .stat.wet .value{ color:var(--wet); } .stat.acc .value{ color:var(--accent); } .stat.sleep .value{ color:var(--sleep); }
+  .medsummary[hidden]{ display:none; }
+  .medsummary{ margin-bottom:16px; }
+  .medsum-grid{ display:flex; flex-wrap:wrap; gap:8px; }
+  .medsum-item{ background:var(--good-soft); border:1px solid var(--good); border-radius:12px; padding:8px 12px; min-width:94px; }
+  .medsum-item .medsum-label{ font-size:.72rem; font-weight:700; color:var(--ink); }
+  .medsum-item .medsum-count{ font-family:'Fraunces', serif; font-size:1.1rem; font-weight:600; color:var(--good); font-variant-numeric:tabular-nums; }
+  .medsum-item .medsum-sub{ font-size:.68rem; color:var(--ink-soft); margin-top:1px; }
+  .medsum-item.over{ background:var(--danger-soft); border-color:var(--danger); }
+  .medsum-item.over .medsum-count{ color:var(--danger); }
 
   h2.sec{ font-family:'Fraunces', serif; font-size:1rem; font-weight:600; margin:20px 0 8px; }
   .timeline{ display:flex; flex-direction:column; gap:1px; background:var(--line); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
@@ -285,6 +294,7 @@
   <main>
     <section class="view active" id="view-today">
       <div class="stat-grid" id="statGrid"></div>
+      <div class="medsummary" id="medSummary" hidden></div>
       <h2 class="sec">Today's timeline</h2>
       <div class="timeline" id="todayTimeline"></div>
     </section>
@@ -369,11 +379,12 @@
     // but kept as their own CATS entries so they still open the plain
     // logger+date+time sheet, and so historical vitd/gaviscon events (logged
     // before the picker existed) keep rendering exactly as before.
-    {key:'vitd', label:'Vitamin D',  note:'Daily drops',      color:'good',  hidden:true},
-    {key:'gaviscon',label:'Gaviscon',note:'Reflux dose',      color:'good',  hidden:true},
-    {key:'calpol',label:'Calpol',   note:'Infant paracetamol',color:'good',  hidden:true},
-    {key:'infacol',label:'Infacol', note:'Anti-colic drops',  color:'good',  hidden:true},
-    {key:'gripe',label:'Gripe water',note:'Wind relief',      color:'good',  hidden:true},
+    {key:'vitd', label:'Vitamin D',  note:'Daily drops',      color:'good',  hidden:true, dose:true},
+    {key:'gaviscon',label:'Gaviscon',note:'Reflux dose',      color:'good',  hidden:true, dose:true},
+    {key:'calpol',label:'Calpol',   note:'Infant paracetamol',color:'good',  hidden:true, dose:true},
+    {key:'infacol',label:'Infacol', note:'Anti-colic drops',  color:'good',  hidden:true, dose:true},
+    {key:'gripe',label:'Gripe water',note:'Wind relief',      color:'good',  hidden:true, dose:true},
+    {key:'teethgel',label:'Chicco Teething Gel',note:'Teething relief',color:'good', hidden:true, dose:true},
     {key:'med_other',label:'Medication',note:'Custom / other',color:'good',  hidden:true, customName:true}
   ];
   var CAT_BY_KEY = {}; CATS.forEach(function(c){ CAT_BY_KEY[c.key]=c; });
@@ -403,6 +414,7 @@
       if ((ev.ty === 'nappy' || ev.ty === 'potty') && ev.nap) bits.push(ev.nap);
       if (typeof ev.dur === 'number') bits.push(ev.dur + ' min');
       if (ev.side) bits.push(ev.side);
+      if (ev.dose) bits.push(ev.dose);
     }
     if (ev.note) bits.push('“' + escText(ev.note) + '”');
     if (bits.length) main += ' · ' + bits.join(' · ');
@@ -549,6 +561,7 @@
       '<div class="stat sleep" style="grid-column:1/-1"><div class="label">Sleep</div><div class="value">'+(sleepMin?durLabel(sleepMin):'0 min')+'</div>'+
       '<div class="sub">'+sleepN+' nap'+(sleepN===1?'':'s')+' logged'+(sleepOpen?' · one still going':'')+'</div></div>';
     renderSleepBanner();
+    renderMedSummary();
   }
 
   // Tracks whether the banner was visible as of the last render, so its
@@ -570,6 +583,57 @@
       '<div class="txt">😴 Asleep since <b>'+sinceLabel+'</b> ('+(open.by||'someone')+')</div><button id="endSleepBtn">End nap</button>';
     document.getElementById('endSleepBtn').addEventListener('click', function(){ openSleepSheet(ref.dateStr, ref.ev); });
     sleepBannerWasVisible = true;
+  }
+
+  // ---------- medication summary (Today tab) ----------
+  // Rolls up today's medication/dose events against the 24h guidance in
+  // DOSE_GUIDE/calpolBand() (defined further down, used here only after the
+  // page has finished loading) so a parent can see at a glance what's been
+  // given today without reading the whole timeline.
+  var MED_SUMMARY_KEYS = ['vitd','gaviscon','calpol','infacol','gripe','teethgel'];
+  function renderMedSummary(){
+    var el = document.getElementById('medSummary');
+    if (!el) return;
+    var rows = [];
+    MED_SUMMARY_KEYS.forEach(function(key){
+      var evs = todayEvents.filter(function(e){ return e.ty === key; });
+      if (!evs.length) return;
+      var dg = doseGuideFor(key);
+      var last = evs.slice().sort(function(a,b){ return cycleTimeKey(b.t)-cycleTimeKey(a.t); })[0];
+      var overMax = !!(dg && dg.maxPerDay && evs.length > dg.maxPerDay);
+      rows.push({
+        label: CAT_BY_KEY[key].label,
+        count: evs.length,
+        max: dg ? dg.maxPerDay : null,
+        sub: 'last ' + last.t + (overMax ? ' · over 24h max' : ''),
+        over: overMax
+      });
+    });
+    var otherEvs = todayEvents.filter(function(e){ return e.ty === 'med_other'; });
+    if (otherEvs.length){
+      var names = {};
+      otherEvs.forEach(function(e){ if (e.med) names[e.med] = true; });
+      var nameList = Object.keys(names);
+      var lastOther = otherEvs.slice().sort(function(a,b){ return cycleTimeKey(b.t)-cycleTimeKey(a.t); })[0];
+      rows.push({
+        label: 'Other medication',
+        count: otherEvs.length,
+        max: null,
+        sub: (nameList.length ? nameList.join(', ') + ' · ' : '') + 'last ' + lastOther.t,
+        over: false
+      });
+    }
+    if (!rows.length){ el.hidden = true; el.innerHTML = ''; return; }
+    el.hidden = false;
+    el.innerHTML = '<h2 class="sec">Medication today</h2><div class="medsum-grid">' +
+      rows.map(function(r){
+        return '<div class="medsum-item'+(r.over ? ' over' : '')+'">'+
+          '<div class="medsum-label">'+escText(r.label)+'</div>'+
+          '<div class="medsum-count">'+r.count+(r.max ? ' / '+r.max : '')+'</div>'+
+          '<div class="medsum-sub">'+escText(r.sub)+'</div>'+
+          '</div>';
+      }).join('') +
+      '</div>';
   }
 
   // Shared stagger delays for "newly appeared" list rows (timeline, growth) —
@@ -651,8 +715,39 @@
     {key:'calpol', label:'Calpol'},
     {key:'infacol', label:'Infacol'},
     {key:'gripe', label:'Gripe water'},
+    {key:'teethgel', label:'Chicco Teething Gel'},
     {key:'med_other', label:'Other…'}
   ];
+
+  // ---------- dosage reference (informational only — see each product's own
+  // packaging/leaflet and a pharmacist or GP before giving any medicine) ----------
+  // Sources: NHS.uk (paracetamol for children), electronic Medicines Compendium
+  // SmPC/PIL for Gaviscon Infant and Woodward's Gripe Water, Infacol product
+  // literature, NHS Start4Life (vitamin D), and the Chicco Gingival Gel 2-in-1
+  // product instructions.
+  var DOSE_GUIDE = {
+    vitd:     { typical:null, unit:'',        maxPerDay:1,    label:'As directed on your drops (NHS guidance: 8.5–10mcg vitamin D, once daily).' },
+    gaviscon: { typical:null, unit:' sachet',  maxPerDay:6,    label:'1 sachet if under 4.5kg, 2 if over — mixed into the feed. Up to 6 doses in 24h.' },
+    infacol:  { typical:0.5,  unit:'ml',       maxPerDay:null, label:'0.5ml (1 dropper) before each feed; up to 1ml if needed after a few days.' },
+    gripe:    { typical:5,    unit:'ml',       maxPerDay:6,    label:'5ml (1 spoonful), during or after a feed, 1–6 months. Up to 6 times in 24h.' },
+    teethgel: { typical:null, unit:'',         maxPerDay:6,    label:'Pea-sized amount, gently massaged on the gum. Up to 6 times in 24h.' }
+  };
+  // Calpol/infant-paracetamol dosing depends on current age, so this is worked
+  // out live from her date of birth rather than hardcoded.
+  function calpolBand(){
+    var dobStr = (growthData && growthData.dob) || GROWTH_DOB;
+    var ageMonths = (Date.now() - new Date(dobStr+'T00:00:00').getTime()) / (1000*60*60*24*30.44);
+    if (ageMonths < 2) return { typical:null, unit:'ml', maxPerDay:null, label:'Under 2 months — ask a GP or pharmacist before giving paracetamol.' };
+    if (ageMonths < 3) return { typical:2.5,  unit:'ml', maxPerDay:2,    label:'2.5ml, up to 2 times in 24h, ≥4h apart (2–3 months, over 4kg).' };
+    if (ageMonths < 6) return { typical:2.5,  unit:'ml', maxPerDay:4,    label:'2.5ml, up to 4 times in 24h, ≥4h apart (3–5 months).' };
+    return { typical:5, unit:'ml', maxPerDay:4, label:'5ml, up to 4 times in 24h, ≥4h apart (6–23 months).' };
+  }
+  function doseGuideFor(key){ return key === 'calpol' ? calpolBand() : DOSE_GUIDE[key]; }
+  function defaultDoseAmt(key){
+    var dg = doseGuideFor(key);
+    return (dg && dg.typical != null) ? (dg.typical + dg.unit) : '';
+  }
+
   function openMedPicker(){
     var html = '<h3><span class="swatch" style="background:var(--good)"></span>Medication</h3>'+
       '<div class="field"><label>Which medication?</label><div class="medlist">'+
@@ -679,6 +774,7 @@
       nap: editCtx ? (editCtx.ev.nap || null) : null,
       side: editCtx ? (editCtx.ev.side || null) : null,
       medName: editCtx ? (editCtx.ev.med || '') : '',
+      doseAmt: editCtx ? (editCtx.ev.dose || '') : (cat.dose ? defaultDoseAmt(cat.key) : ''),
       note: editCtx ? (editCtx.ev.note || '') : '',
       time: editCtx ? editCtx.ev.t : hhmm(new Date()),
       date: editCtx ? calendarDateForEvent(editCtx.dateStr, editCtx.ev.t) : dstr(new Date()),
@@ -748,6 +844,22 @@
       html += '<div class="field"><label>Medication name</label>'+
         '<input type="text" id="medNameInput" placeholder="e.g. Teething gel" value="'+escText(sheetState.medName)+'"></div>';
     }
+    if (c.dose){
+      var dg = doseGuideFor(c.key);
+      var targetCycleDay = cycleDateForManual(sheetState.date, sheetState.time);
+      var doseCountToday = (targetCycleDay === currentCycle) ? todayEvents.filter(function(e){ return e.ty === c.key; }).length : null;
+      html += '<div class="field"><label>Amount given</label>'+
+        '<input type="text" id="doseAmtInput" placeholder="'+escText(dg.typical!=null ? (dg.typical+dg.unit) : (dg.unit||'e.g. pea-sized'))+'" value="'+escText(sheetState.doseAmt||'')+'"></div>';
+      html += '<div class="hint">'+escText(dg.label)+'</div>';
+      if (doseCountToday !== null){
+        var nextN = doseCountToday + 1;
+        var overMax = dg.maxPerDay && nextN > dg.maxPerDay;
+        html += '<div class="hint"'+(overMax ? ' style="color:var(--danger);font-weight:600"' : '')+'>'+
+          (overMax ? '⚠ ' : '') + 'This will be dose ' + nextN + (dg.maxPerDay ? ' of up to ' + dg.maxPerDay : '') + ' today (09:00–08:59)' +
+          (overMax ? ' — over the usual 24h max, check with a pharmacist/GP.' : '.') +
+          '</div>';
+      }
+    }
 
     html += '<div class="field"><label>Note (optional)</label>'+
       '<textarea id="noteInput" rows="2" placeholder="Anything to note? e.g. heavy nappy">'+escText(sheetState.note)+'</textarea></div>';
@@ -767,6 +879,7 @@
         sheetState.ml = null; sheetState.nap = null; sheetState.side = null; sheetState.leftover = null;
         sheetState.dur = newCat.durDefault || null;
         sheetState.medName = '';
+        sheetState.doseAmt = newCat.dose ? defaultDoseAmt(newCat.key) : '';
         renderSheet();
       });
     });
@@ -795,6 +908,8 @@
     if (otherIn) otherIn.addEventListener('input', function(){ sheetState.logger = this.value || '__other__'; });
     var medNameIn = document.getElementById('medNameInput');
     if (medNameIn) medNameIn.addEventListener('input', function(){ sheetState.medName = this.value; });
+    var doseAmtIn = document.getElementById('doseAmtInput');
+    if (doseAmtIn) doseAmtIn.addEventListener('input', function(){ sheetState.doseAmt = this.value; });
     var noteIn = document.getElementById('noteInput');
     if (noteIn) noteIn.addEventListener('input', function(){ sheetState.note = this.value; });
   }
@@ -826,6 +941,7 @@
     if (c.side && sheetState.side) ev.side = sheetState.side;
     if (c.dur && sheetState.dur) ev.dur = sheetState.dur;
     if (c.customName) ev.med = sheetState.medName.trim();
+    if (c.dose && sheetState.doseAmt && sheetState.doseAmt.trim()) ev.dose = sheetState.doseAmt.trim();
     if (sheetState.note && sheetState.note.trim()) ev.note = sheetState.note.trim();
 
     rememberLogger(loggerName);
@@ -1616,7 +1732,7 @@
       '2. Weekly summary — the same totals rolled up by ISO week.',
       '3. Event log — every single logged event, one row each: time, who logged it, type, ' +
         'ml offered/left/taken, nappy/potty type, duration, sleep end time, medication name (for a ' +
-        'custom "Other" medication), and any note left on the entry.',
+        'custom "Other" medication), dose given (for medication entries), and any note left on the entry.',
       '4. Who logged what — a tally of events per person.',
       '5. Leftover adjustments — every bottle feed where a leftover amount was recorded, ' +
         'showing what was offered, what was left, and what was actually taken.',
@@ -1651,7 +1767,7 @@
   // ---------- Sheet: Event log ----------
   var EVLOG_HEADERS = ['Date', 'Time', 'Logged by', 'Event type', 'Offered ml', 'Leftover ml',
     'Taken ml (net)', 'Nappy / potty', 'Side', 'Duration min', 'Sleep end', 'Sleep duration min',
-    'Medication (if "Other")', 'Note'];
+    'Medication (if "Other")', 'Dose given', 'Note'];
 
   function buildEventLog(wb, days) {
     var ws = wb.addWorksheet('Event log');
@@ -1659,7 +1775,7 @@
       var c = ws.getCell(1, 1 + i);
       c.value = h; c.font = HEADER_FONT; c.fill = HEADER_FILL; c.alignment = CENTER;
     });
-    var widths = [12, 9, 14, 13, 11, 11, 13, 12, 8, 12, 10, 15, 20, 30];
+    var widths = [12, 9, 14, 13, 11, 11, 13, 12, 8, 12, 10, 15, 20, 14, 30];
     widths.forEach(function (w, i) { ws.getColumn(1 + i).width = w; });
 
     var r = 2;
@@ -1685,7 +1801,8 @@
           if (typeof e.dur === 'number' && e.end) ws.getCell(r, 12).value = e.dur;
         }
         if (ty === 'med_other' && e.med) ws.getCell(r, 13).value = e.med;
-        if (e.note) { ws.getCell(r, 14).value = e.note; ws.getCell(r, 14).alignment = LEFT_WRAP; }
+        if (e.dose) ws.getCell(r, 14).value = e.dose;
+        if (e.note) { ws.getCell(r, 15).value = e.note; ws.getCell(r, 15).alignment = LEFT_WRAP; }
         for (var col = 1; col <= EVLOG_HEADERS.length; col++) {
           var cell = ws.getCell(r, col);
           cell.font = col === 7 ? FORMULA_FONT : BODY_FONT;
