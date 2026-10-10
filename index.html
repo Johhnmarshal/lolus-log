@@ -171,6 +171,9 @@
   .tfresh.ok{ color:var(--good); }
   .tfresh.warn{ color:var(--milk); }
   .tfresh.expired{ color:var(--danger); }
+  .tnap{ font-size:.68rem; font-weight:700; margin-top:2px; }
+  .tnap.warn{ color:var(--milk); }
+  .tnap.overdue{ color:var(--danger); }
 
   h2.sec{ font-family:'Fraunces', serif; font-size:1rem; font-weight:600; margin:20px 0 8px; }
   .timeline{ display:flex; flex-direction:column; gap:1px; background:var(--line); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
@@ -666,6 +669,7 @@
     var prevIds = prevTimelineIds || {};
     var nextIds = {};
     var staggerN = 0;
+    var latestNap = latestEndedSleep();
     el.innerHTML = sorted.map(function(e){
       var d = describeEvent(e);
       var isNew = !prevIds[e.id];
@@ -674,10 +678,16 @@
       if (isNew){ animClass = ' ease-slide-up '+STAGGER_DELAYS[staggerN % STAGGER_DELAYS.length]; staggerN++; }
       var fr = feedFreshness(e);
       var frHtml = fr ? '<div class="tfresh '+feedFreshnessText(fr.end).status+'" data-end="'+fr.end+'">'+escText(feedFreshnessText(fr.end).text)+'</div>' : '';
+      var napHtml = '';
+      if (latestNap && e.id === latestNap.id){
+        var wakeTs = new Date(calendarDateForEvent(currentCycle, e.end)+'T'+e.end+':00').getTime();
+        var wi = wakeWindowText(wakeTs);
+        if (wi) napHtml = '<div class="tnap '+wi.status+'" data-wake="'+wakeTs+'">'+escText(wi.text)+'</div>';
+      }
       return '<div class="trow'+animClass+'">'+
         '<div class="tdot" style="background:var(--'+d.color+')"></div>'+
         '<div class="ttime">'+e.t+'</div>'+
-        '<div class="tmain"><div class="tt">'+d.title+'</div><div class="tb">'+(e.by||'')+'</div>'+frHtml+'</div>'+
+        '<div class="tmain"><div class="tt">'+d.title+'</div><div class="tb">'+(e.by||'')+'</div>'+frHtml+napHtml+'</div>'+
         '<button class="tedit" data-id="'+e.id+'" title="Edit">✎</button>'+
         '<button class="tdel" data-id="'+e.id+'" title="Delete">✕</button>'+
         '</div>';
@@ -819,6 +829,39 @@
     document.querySelectorAll('.tfresh[data-end]').forEach(function(elx){
       var info = feedFreshnessText(Number(elx.dataset.end));
       elx.className = 'tfresh ' + info.status;
+      elx.textContent = info.text;
+    });
+  }
+
+  // Wake-window wind-down hint for the most recent nap on today's timeline.
+  // Stays quiet for the first WIND_DOWN_BUFFER_MINS after she wakes, then
+  // nudges toward winding down, then flags the window as passed. Easy to
+  // retune here as her wake window stretches over the coming months.
+  var WAKE_WINDOW_MINS = 120;
+  var WIND_DOWN_BUFFER_MINS = 90;
+  // Today's most recently-logged nap, but only once it has actually ended —
+  // an ongoing nap (no wake time yet) has no wake window to count from.
+  function latestEndedSleep(){
+    var naps = todayEvents.filter(function(e){ return e.ty === 'sleep'; })
+      .slice().sort(function(a,b){ return cycleTimeKey(b.t)-cycleTimeKey(a.t); });
+    return (naps.length && naps[0].end) ? naps[0] : null;
+  }
+  function wakeWindowText(wakeTs){
+    var diffMin = (Date.now() - wakeTs) / 60000;
+    if (diffMin < WIND_DOWN_BUFFER_MINS) return null;
+    if (diffMin < WAKE_WINDOW_MINS){
+      var dueTs = wakeTs + WAKE_WINDOW_MINS*60000;
+      return { status:'warn', text:'⚠ Start winding down — nap due ~'+hhmm(new Date(dueTs)) };
+    }
+    var overMin = Math.round(diffMin - WAKE_WINDOW_MINS);
+    var h = Math.floor(overMin/60), m = overMin%60;
+    return { status:'overdue', text:'⚠ Nap overdue — wake window passed '+(h?h+'h ':'')+m+'m ago' };
+  }
+  function tickWakeWindow(){
+    document.querySelectorAll('.tnap[data-wake]').forEach(function(elx){
+      var info = wakeWindowText(Number(elx.dataset.wake));
+      if (!info) return;
+      elx.className = 'tnap ' + info.status;
       elx.textContent = info.text;
     });
   }
@@ -2483,6 +2526,7 @@
   renderHistAge();
   setInterval(checkCycleRollover, 5*60*1000);
   setInterval(tickFeedFreshness, 30*1000);
+  setInterval(tickWakeWindow, 30*1000);
   setInterval(renderHistAge, 60*60*1000);
 
   var addWeightBtn = document.getElementById('addWeightBtn');
