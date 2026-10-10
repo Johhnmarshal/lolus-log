@@ -250,6 +250,7 @@
   .hist-toggle button.on{ background:var(--accent-soft); border-color:var(--accent); color:var(--accent-ink); }
   .hist-toggle button.exportbtn{ margin-left:auto; background:var(--surface); border-color:var(--line-strong); color:var(--ink); }
   .hist-toggle button.exportbtn:disabled{ opacity:.6; cursor:default; }
+  .hist-age{ font-size:.78rem; color:var(--ink-soft); text-align:right; margin:-4px 0 12px; font-variant-numeric:tabular-nums; }
   .day-card{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:13px 14px; margin-bottom:9px; box-shadow:var(--shadow); cursor:pointer; }
   .day-card .dhead{ display:flex; justify-content:space-between; align-items:baseline; }
   .day-card .ddate{ font-weight:800; font-size:.92rem; }
@@ -316,6 +317,7 @@
         <button data-mode="weeks">Weeks</button>
         <button id="exportBtn" class="exportbtn" type="button">⇩ Export</button>
       </div>
+      <div class="hist-age" id="histAge"></div>
       <div id="historyList">
         <div class="ease-skeleton-shimmer" style="height:76px;border-radius:14px;margin-bottom:9px"></div>
         <div class="ease-skeleton-shimmer" style="height:76px;border-radius:14px;margin-bottom:9px"></div>
@@ -804,7 +806,7 @@
   }
   function feedFreshnessText(endTs){
     var diff = endTs - Date.now();
-    if (diff <= 0) return { status:'expired', text:'⚠ Use-by passed — discard any leftover' };
+    if (diff <= 0) return { status:'expired', text:'⚠ Use-by passed — LOG & discard any leftover' };
     var totalMin = Math.ceil(diff/60000);
     var h = Math.floor(totalMin/60), m = totalMin%60;
     var left = (h ? h+'h ' : '') + m + 'm';
@@ -1574,6 +1576,36 @@
     var w = Math.floor(days/7), d = days%7;
     return w+'w'+(d?' '+d+'d':'');
   }
+
+  // Lolu's current age as full calendar years, then full weeks, then leftover
+  // days within the current year — shown next to the History tab's Export
+  // button so it's always visible without opening the Growth tab.
+  function ageYWD(dobStr, now){
+    var dob = new Date(dobStr+'T00:00:00');
+    // Count whole calendar days only — strip "now"'s time-of-day first, or a
+    // dob logged at midnight vs. "now" at, say, 2pm would overcount by a day.
+    var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    var y = today.getFullYear() - dob.getFullYear();
+    var anniv = new Date(dob.getTime());
+    anniv.setFullYear(dob.getFullYear()+y);
+    if (anniv > today){ y--; anniv = new Date(dob.getTime()); anniv.setFullYear(dob.getFullYear()+y); }
+    var remDays = Math.round((today - anniv) / (1000*60*60*24));
+    var w = Math.floor(remDays/7), d = remDays%7;
+    return { y:y, w:w, d:d };
+  }
+  function histAgeText(){
+    var dobStr = (growthData && growthData.dob) || GROWTH_DOB;
+    var a = ageYWD(dobStr, new Date());
+    var bits = [];
+    if (a.y) bits.push(a.y+'y');
+    if (a.y || a.w) bits.push(a.w+'w');
+    bits.push(a.d+'d');
+    return 'Lolu is ' + bits.join(' ') + ' old';
+  }
+  function renderHistAge(){
+    var el = document.getElementById('histAge');
+    if (el) el.textContent = histAgeText();
+  }
   function fmtKg(kg){ return (Math.round(kg*1000)/1000).toString(); }
 
   function renderGrowthChart(measurements){
@@ -1696,11 +1728,12 @@
   function subscribeGrowth(){
     if (unsubGrowth){ unsubGrowth(); unsubGrowth = null; }
     if (!db) return;
-    fetchGrowth(function(data){ growthData = data; renderGrowth(); });
+    fetchGrowth(function(data){ growthData = data; renderGrowth(); renderHistAge(); });
     var channel = db.channel('growth-lolu-'+TAB_ID)
       .on('postgres_changes', {event:'*', schema:'public', table:'growth', filter:'id=eq.lolu'}, function(payload){
         growthData = payload.new || {dob: GROWTH_DOB, measurements: []};
         renderGrowth();
+        renderHistAge();
       })
       .subscribe();
     unsubGrowth = function(){ db.removeChannel(channel); };
@@ -2447,8 +2480,10 @@
 
   // ---------- boot ----------
   renderCycLabel(); renderCatGrid(); renderStats(); renderTimeline();
+  renderHistAge();
   setInterval(checkCycleRollover, 5*60*1000);
   setInterval(tickFeedFreshness, 30*1000);
+  setInterval(renderHistAge, 60*60*1000);
 
   var addWeightBtn = document.getElementById('addWeightBtn');
   if (addWeightBtn) addWeightBtn.addEventListener('click', function(){ openGrowthSheet(null); });
