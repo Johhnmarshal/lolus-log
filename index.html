@@ -167,6 +167,10 @@
   .medsum-next{ font-size:.7rem; font-weight:700; margin-top:3px; }
   .medsum-next.wait, .medsum-next.limit{ color:var(--danger); }
   .medsum-next.ok{ color:var(--good); }
+  .tfresh{ font-size:.68rem; font-weight:700; margin-top:2px; }
+  .tfresh.ok{ color:var(--good); }
+  .tfresh.warn{ color:var(--milk); }
+  .tfresh.expired{ color:var(--danger); }
 
   h2.sec{ font-family:'Fraunces', serif; font-size:1rem; font-weight:600; margin:20px 0 8px; }
   .timeline{ display:flex; flex-direction:column; gap:1px; background:var(--line); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
@@ -666,10 +670,12 @@
       nextIds[e.id] = true;
       var animClass = '';
       if (isNew){ animClass = ' ease-slide-up '+STAGGER_DELAYS[staggerN % STAGGER_DELAYS.length]; staggerN++; }
+      var fr = feedFreshness(e);
+      var frHtml = fr ? '<div class="tfresh '+feedFreshnessText(fr.end).status+'" data-end="'+fr.end+'">'+escText(feedFreshnessText(fr.end).text)+'</div>' : '';
       return '<div class="trow'+animClass+'">'+
         '<div class="tdot" style="background:var(--'+d.color+')"></div>'+
         '<div class="ttime">'+e.t+'</div>'+
-        '<div class="tmain"><div class="tt">'+d.title+'</div><div class="tb">'+(e.by||'')+'</div></div>'+
+        '<div class="tmain"><div class="tt">'+d.title+'</div><div class="tb">'+(e.by||'')+'</div>'+frHtml+'</div>'+
         '<button class="tedit" data-id="'+e.id+'" title="Edit">✎</button>'+
         '<button class="tdel" data-id="'+e.id+'" title="Delete">✕</button>'+
         '</div>';
@@ -778,6 +784,41 @@
       return { status:'ok', text:'OK to give now' };
     }
     return null;
+  }
+
+  // How long a started bottle/expressed-milk feed is safe to still offer, once
+  // baby has begun drinking (bacteria from saliva mean it shouldn't sit out
+  // indefinitely) — Tobi's own guidance: formula (C&G) and mixed feeds (since
+  // they contain formula) are good for 1h from the start of the feed; EBM on
+  // its own is good for up to 2h.
+  var FEED_WINDOW_MINS = { cg:60, ebm:120, mixed:60 };
+  function feedFreshness(ev){
+    var mins = FEED_WINDOW_MINS[ev.ty];
+    if (!mins) return null;
+    // A leftover of exactly 0 means the bottle was finished — nothing left to
+    // worry about re-offering, so there's nothing useful to count down.
+    if (typeof ev.leftover === 'number' && ev.leftover === 0) return null;
+    var calDate = calendarDateForEvent(currentCycle, ev.t);
+    var start = new Date(calDate+'T'+ev.t+':00');
+    return { end: start.getTime() + mins*60*1000 };
+  }
+  function feedFreshnessText(endTs){
+    var diff = endTs - Date.now();
+    if (diff <= 0) return { status:'expired', text:'⚠ Use-by passed — discard any leftover' };
+    var totalMin = Math.ceil(diff/60000);
+    var h = Math.floor(totalMin/60), m = totalMin%60;
+    var left = (h ? h+'h ' : '') + m + 'm';
+    var warn = diff <= 15*60*1000;
+    return { status: warn ? 'warn' : 'ok', text: (warn ? '⚠ ' : '✓ ') + 'Good for ' + left + ' more · use by ' + hhmm(new Date(endTs)) };
+  }
+  // Keeps the live countdowns on today's timeline ticking over without a full
+  // re-render (which would tear down entrance animations / scroll position).
+  function tickFeedFreshness(){
+    document.querySelectorAll('.tfresh[data-end]').forEach(function(elx){
+      var info = feedFreshnessText(Number(elx.dataset.end));
+      elx.className = 'tfresh ' + info.status;
+      elx.textContent = info.text;
+    });
   }
 
   function openMedPicker(){
@@ -2407,6 +2448,7 @@
   // ---------- boot ----------
   renderCycLabel(); renderCatGrid(); renderStats(); renderTimeline();
   setInterval(checkCycleRollover, 5*60*1000);
+  setInterval(tickFeedFreshness, 30*1000);
 
   var addWeightBtn = document.getElementById('addWeightBtn');
   if (addWeightBtn) addWeightBtn.addEventListener('click', function(){ openGrowthSheet(null); });
