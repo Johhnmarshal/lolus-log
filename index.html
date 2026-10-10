@@ -164,6 +164,9 @@
   .medsum-item .medsum-sub{ font-size:.68rem; color:var(--ink-soft); margin-top:1px; }
   .medsum-item.over{ background:var(--danger-soft); border-color:var(--danger); }
   .medsum-item.over .medsum-count{ color:var(--danger); }
+  .medsum-next{ font-size:.7rem; font-weight:700; margin-top:3px; }
+  .medsum-next.wait, .medsum-next.limit{ color:var(--danger); }
+  .medsum-next.ok{ color:var(--good); }
 
   h2.sec{ font-family:'Fraunces', serif; font-size:1rem; font-weight:600; margin:20px 0 8px; }
   .timeline{ display:flex; flex-direction:column; gap:1px; background:var(--line); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
@@ -601,12 +604,14 @@
       var dg = doseGuideFor(key);
       var last = evs.slice().sort(function(a,b){ return cycleTimeKey(b.t)-cycleTimeKey(a.t); })[0];
       var overMax = !!(dg && dg.maxPerDay && evs.length > dg.maxPerDay);
+      var ni = nextDoseInfo(key);
       rows.push({
         label: CAT_BY_KEY[key].label,
         count: evs.length,
         max: dg ? dg.maxPerDay : null,
         sub: 'last ' + last.t + (overMax ? ' · over 24h max' : ''),
-        over: overMax
+        over: overMax,
+        next: (ni && ni.status !== 'ok') ? ni : null
       });
     });
     var otherEvs = todayEvents.filter(function(e){ return e.ty === 'med_other'; });
@@ -620,7 +625,8 @@
         count: otherEvs.length,
         max: null,
         sub: (nameList.length ? nameList.join(', ') + ' · ' : '') + 'last ' + lastOther.t,
-        over: false
+        over: false,
+        next: null
       });
     }
     if (!rows.length){ el.hidden = true; el.innerHTML = ''; return; }
@@ -631,6 +637,7 @@
           '<div class="medsum-label">'+escText(r.label)+'</div>'+
           '<div class="medsum-count">'+r.count+(r.max ? ' / '+r.max : '')+'</div>'+
           '<div class="medsum-sub">'+escText(r.sub)+'</div>'+
+          (r.next ? '<div class="medsum-next '+r.next.status+'">'+escText(r.next.text)+'</div>' : '')+
           '</div>';
       }).join('') +
       '</div>';
@@ -737,15 +744,40 @@
   function calpolBand(){
     var dobStr = (growthData && growthData.dob) || GROWTH_DOB;
     var ageMonths = (Date.now() - new Date(dobStr+'T00:00:00').getTime()) / (1000*60*60*24*30.44);
-    if (ageMonths < 2) return { typical:null, unit:'ml', maxPerDay:null, label:'Under 2 months — ask a GP or pharmacist before giving paracetamol.' };
-    if (ageMonths < 3) return { typical:2.5,  unit:'ml', maxPerDay:2,    label:'2.5ml, up to 2 times in 24h, ≥4h apart (2–3 months, over 4kg).' };
-    if (ageMonths < 6) return { typical:2.5,  unit:'ml', maxPerDay:4,    label:'2.5ml, up to 4 times in 24h, ≥4h apart (3–5 months).' };
-    return { typical:5, unit:'ml', maxPerDay:4, label:'5ml, up to 4 times in 24h, ≥4h apart (6–23 months).' };
+    if (ageMonths < 2) return { typical:null, unit:'ml', maxPerDay:null, minGapHrs:null, label:'Under 2 months — ask a GP or pharmacist before giving paracetamol.' };
+    if (ageMonths < 3) return { typical:2.5,  unit:'ml', maxPerDay:2,    minGapHrs:4, label:'2.5ml, up to 2 times in 24h, ≥4h apart (2–3 months, over 4kg).' };
+    if (ageMonths < 6) return { typical:2.5,  unit:'ml', maxPerDay:4,    minGapHrs:4, label:'2.5ml, up to 4 times in 24h, ≥4h apart (3–5 months).' };
+    return { typical:5, unit:'ml', maxPerDay:4, minGapHrs:4, label:'5ml, up to 4 times in 24h, ≥4h apart (6–23 months).' };
   }
   function doseGuideFor(key){ return key === 'calpol' ? calpolBand() : DOSE_GUIDE[key]; }
   function defaultDoseAmt(key){
     var dg = doseGuideFor(key);
     return (dg && dg.typical != null) ? (dg.typical + dg.unit) : '';
+  }
+  // When the next PRN dose is actually due — combines the daily cap (resets
+  // at the 09:00 cycle boundary) with, for medicines that have one (Calpol's
+  // NHS-stated >=4h gap), a minimum interval since the last dose. Returns
+  // null when there's nothing to say (nothing given yet today, or this
+  // medicine has neither a cap nor a minimum gap to check).
+  function nextDoseInfo(key){
+    var dg = doseGuideFor(key);
+    if (!dg) return null;
+    var evs = todayEvents.filter(function(e){ return e.ty === key; });
+    if (!evs.length) return null;
+    var last = evs.slice().sort(function(a,b){ return cycleTimeKey(b.t)-cycleTimeKey(a.t); })[0];
+    if (dg.maxPerDay && evs.length >= dg.maxPerDay){
+      return { status:'limit', text:'Today’s limit reached — resets 09:00' };
+    }
+    if (dg.minGapHrs){
+      var lastCalDate = calendarDateForEvent(currentCycle, last.t);
+      var lastDt = new Date(lastCalDate+'T'+last.t+':00');
+      var nextDt = new Date(lastDt.getTime() + dg.minGapHrs*60*60*1000);
+      if (Date.now() < nextDt.getTime()){
+        return { status:'wait', text:'Next dose from ' + hhmm(nextDt) };
+      }
+      return { status:'ok', text:'OK to give now' };
+    }
+    return null;
   }
 
   function openMedPicker(){
@@ -851,6 +883,11 @@
       html += '<div class="field"><label>Amount given</label>'+
         '<input type="text" id="doseAmtInput" placeholder="'+escText(dg.typical!=null ? (dg.typical+dg.unit) : (dg.unit||'e.g. pea-sized'))+'" value="'+escText(sheetState.doseAmt||'')+'"></div>';
       html += '<div class="hint">'+escText(dg.label)+'</div>';
+      var ni = nextDoseInfo(c.key);
+      if (ni){
+        html += '<div class="hint"'+(ni.status==='ok' ? ' style="color:var(--good);font-weight:600"' : ' style="color:var(--danger);font-weight:600"')+'>'+
+          (ni.status==='ok' ? '✓ ' : '⚠ ') + escText(ni.text) + '</div>';
+      }
       if (doseCountToday !== null){
         var nextN = doseCountToday + 1;
         var overMax = dg.maxPerDay && nextN > dg.maxPerDay;
